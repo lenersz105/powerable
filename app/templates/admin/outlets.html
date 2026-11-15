@@ -1,0 +1,145 @@
+{% extends "admin/base_admin.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block admin_title %}Outlets &amp; labels{% endblock %}
+{% block admin_subtitle %}
+  Every physical outlet known to this database. New labels are single-use.
+{% endblock %}
+
+{% block admin_actions %}
+  <a class="btn btn-primary" href="{{ url_for('admin.new_outlet') }}">
+    {{ icon('qr') }} Generate QR label
+  </a>
+{% endblock %}
+
+{% block admin_content %}
+<section class="admin-stat-strip" aria-label="Outlet totals">
+  <span><strong>{{ stats.outlets }}</strong> total</span>
+  <span><strong>{{ stats.available }}</strong> available</span>
+  <span><strong>{{ stats.registered }}</strong> registered</span>
+  <span><strong>{{ stats.revoked }}</strong> revoked</span>
+</section>
+
+<form class="admin-filter-bar glass-panel" method="get" action="{{ url_for('admin.outlets') }}">
+  <label class="field">
+    Search
+    <input type="search" name="search" value="{{ search }}" maxlength="80"
+           placeholder="Device ID, outlet name, or owner" autocomplete="off">
+  </label>
+  <label class="field">
+    State
+    <select name="state">
+      <option value="">Any state</option>
+      {% for value in states %}
+        <option value="{{ value }}" {% if state == value %}selected{% endif %}>{{ value }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ icon('gauge') }} Filter</button>
+    {% if search or state %}
+      <a class="btn btn-ghost" href="{{ url_for('admin.outlets') }}">Reset</a>
+    {% endif %}
+  </div>
+</form>
+
+{% if outlets %}
+  <div class="admin-outlet-list">
+    {% for outlet in outlets %}
+      <article class="admin-outlet-card glass-panel">
+        <header class="admin-outlet-head">
+          <div class="admin-outlet-title">
+            <h2>{{ outlet.device_uid }}</h2>
+            <p>
+              {{ outlet.device_type }}
+              {% if outlet.outlet_name %}· {{ outlet.outlet_name }}{% endif %}
+            </p>
+          </div>
+          <span class="tag">{{ outlet.pairing_label }}</span>
+        </header>
+
+        <dl class="admin-outlet-meta">
+          <div><dt>Owner</dt><dd>{{ outlet.owner.username if outlet.owner else '—' }}</dd></div>
+          <div><dt>Channel</dt><dd>{{ outlet.channel or '—' }}</dd></div>
+          <div><dt>Registered</dt><dd>{{ outlet.registered_at.strftime('%d %b %Y') if outlet.registered_at else '—' }}</dd></div>
+          <div><dt>Last seen</dt><dd>{{ outlet.last_seen_at.strftime('%d %b %Y, %H:%M') if outlet.last_seen_at else 'Never' }}</dd></div>
+        </dl>
+
+        <details class="admin-outlet-tools">
+          <summary>{{ icon('menu') }} Manage {{ outlet.device_uid }}</summary>
+
+          <div class="admin-tool-grid">
+            <section class="admin-tool">
+              <h3>Rename</h3>
+              <form class="form-grid" method="post"
+                    action="{{ url_for('admin.rename_outlet', outlet_id=outlet.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="field">
+                  Display name
+                  <input type="text" name="outlet_name" value="{{ outlet.outlet_name or '' }}"
+                         maxlength="80" placeholder="Living room lamp" required>
+                </label>
+                <div class="form-actions">
+                  <button class="btn btn-glass btn-sm" type="submit">Save name</button>
+                </div>
+              </form>
+            </section>
+
+            {% if outlet.pairing_state != 'revoked' %}
+              <section class="admin-tool">
+                <h3>Revoke</h3>
+                <p class="admin-tool-note">Clears pairing material and releases ownership. The outlet record stays.</p>
+                <form class="form-grid" method="post"
+                      action="{{ url_for('admin.revoke_outlet', outlet_id=outlet.id) }}"
+                      data-confirm="Revoke {{ outlet.device_uid }} and release it from its owner?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="field">
+                    Reason (optional)
+                    <input type="text" name="reason" maxlength="200" placeholder="Returned by customer">
+                  </label>
+                  <div class="form-actions">
+                    <button class="btn btn-danger btn-sm" type="submit">Revoke outlet</button>
+                  </div>
+                </form>
+              </section>
+            {% endif %}
+
+            <section class="admin-tool admin-tool-danger">
+              <h3>Delete permanently</h3>
+              <p class="admin-tool-note">Removes the outlet and all of its device events. This cannot be undone.</p>
+              <form class="form-grid" method="post"
+                    action="{{ url_for('admin.delete_outlet', outlet_id=outlet.id) }}"
+                    data-confirm="Permanently delete {{ outlet.device_uid }} and its event history?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="field">
+                  Type <strong>{{ outlet.device_uid }}</strong> to confirm
+                  <input type="text" name="confirm_device_id" required maxlength="64"
+                         autocapitalize="characters" spellcheck="false" autocomplete="off">
+                </label>
+                <div class="form-actions">
+                  <button class="btn btn-danger btn-sm" type="submit">Delete outlet</button>
+                </div>
+              </form>
+            </section>
+          </div>
+        </details>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <section class="content-card admin-empty-panel">
+    <span class="admin-quick-icon">{{ icon('qr') }}</span>
+    <h2>No outlets match this view.</h2>
+    {% if search or state %}
+      <p>Clear the filter, or generate a label for a new device.</p>
+      <div class="form-actions">
+        <a class="btn btn-ghost" href="{{ url_for('admin.outlets') }}">Clear filter</a>
+        <a class="btn btn-primary" href="{{ url_for('admin.new_outlet') }}">Generate QR label</a>
+      </div>
+    {% else %}
+      <p>Provision the first physical outlet to create its single-use QR label.</p>
+      <a class="btn btn-primary" href="{{ url_for('admin.new_outlet') }}">Generate QR label</a>
+    {% endif %}
+  </section>
+{% endif %}
+{% endblock %}

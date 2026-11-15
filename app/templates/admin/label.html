@@ -1,0 +1,82 @@
+{% extends "admin/base_admin.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block admin_title %}Pairing label{% endblock %}
+{% block admin_subtitle %}
+  Show this page once, print it, then attach the label to the outlet before handing it over.
+{% endblock %}
+
+{% block admin_actions %}
+  <a class="btn btn-ghost" href="{{ url_for('admin.outlets') }}">
+    {{ icon('arrow-left') }} Back to outlets
+  </a>
+{% endblock %}
+
+{% block admin_content %}
+<div class="admin-label-layout">
+  <section class="label-card" id="pairing-label" aria-label="Printable pairing label">
+    <header class="label-head">
+      <span class="label-brand-mark">{{ icon('bolt') }}</span>
+      <div>
+        <strong>Power<span>Able</span></strong>
+        <small>Smart power outlet</small>
+      </div>
+    </header>
+
+    <p class="label-kicker">Device ID</p>
+    <p class="label-device" data-device-id="{{ outlet.device_uid }}">{{ outlet.device_uid }}</p>
+
+    <div class="label-qr" role="img" aria-label="QR code containing the single-use pairing code">
+      {{ qr_svg|safe }}
+    </div>
+
+    <p class="label-kicker">Pairing code</p>
+    <code class="label-code" data-pairing-code="{{ pairing_code }}">{{ pairing_code }}</code>
+
+    <ol class="label-steps">
+      <li>Open PowerAble and sign in.</li>
+      <li>Choose <strong>Add Smart Outlet</strong>.</li>
+      <li>Scan this QR code, or type the device ID and pairing code.</li>
+      <li>Confirm the outlet belongs to you.</li>
+    </ol>
+
+    <p class="label-foot">Single-use code · No Wi-Fi password or permanent secret is stored in this QR.</p>
+  </section>
+
+  <aside class="content-card admin-label-aside">
+    <div class="card-heading">
+      <h2>Shown once</h2>
+      <p>This pairing code is not stored in plaintext anywhere — only its scrypt hash is kept.</p>
+    </div>
+
+    <div class="admin-label-facts">
+      <div><span>Device ID</span><strong>{{ outlet.device_uid }}</strong></div>
+      <div><span>Type</span><strong>{{ outlet.device_type }}</strong></div>
+      <div><span>State</span><strong>{{ outlet.pairing_label }}</strong></div>
+    </div>
+
+    <div class="notice notice-neutral" role="note">
+      {{ icon('shield') }}
+      <div>
+        <strong>If you lose this code</strong>
+        <p>Generate a new label for the same device ID. The old code is replaced immediately.</p>
+      </div>
+    </div>
+
+    <div class="form-actions admin-label-buttons">
+      <button class="btn btn-primary" type="button" data-print>
+        {{ icon('book') }} Print label
+      </button>
+      <button class="btn btn-glass" type="button" data-copy="{{ pairing_code }}">
+        {{ icon('check') }} Copy code
+      </button>
+      <a class="btn btn-ghost" href="{{ url_for('admin.outlets') }}">Done</a>
+    </div>
+
+    <p class="panel-note">
+      The label is not online by itself. The outlet stays “Waiting for first reading” until
+      verified hardware telemetry arrives.
+    </p>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+# Render Blueprint for PowerAble.
+#
+# This default uses Render's free web service and free Postgres so the app can
+# be deployed at no cost for evaluation. Free Postgres expires 30 days after
+# creation and free web services sleep after 15 minutes of inactivity. For a
+# real installation, upgrade the plans or attach a persistent disk as described
+# in docs/render-deployment.md.
+#
+# Region defaults to oregon. Change it to singapore (or another Render region)
+# before the first deploy if you are in Asia; a resource's region cannot be
+# changed after creation.
+
+services:
+  - type: web
+    name: powerable
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash scripts/render_start.sh
+    healthCheckPath: /
+    envVars:
+      - key: FLASK_ENV
+        value: production
+
+      # Generated once by Render and never committed to git.
+      - key: SECRET_KEY
+        generateValue: true
+
+      # Render Postgres internal connection string. app/config.py rewrites
+      # postgres:// and postgresql:// to postgresql+psycopg:// automatically.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: powerable-db
+          property: connectionString
+
+      # The shared ESP32 X-Device-Key. Paste the existing value from your
+      # local .env, or let Render generate one and copy it into the firmware.
+      - key: DEVICE_API_KEY
+        sync: false
+
+      # Public HTTPS base for registration QR links. Self-references the
+      # service's own onrender.com URL. Override this value (or edit the
+      # Blueprint) if you attach a custom domain.
+      - key: PUBLIC_BASE_URL
+        fromService:
+          name: powerable
+          type: web
+          envVarKey: RENDER_EXTERNAL_URL
+
+      # Optional first-admin bootstrap. scripts/render_start.sh creates this
+      # account only when no active admin exists, then skips on later starts.
+      # Leave either value blank to skip bootstrap and create the admin later.
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+
+      # Render serves HTTPS, so cookies must be Secure.
+      - key: SESSION_COOKIE_SECURE
+        value: "1"
+
+databases:
+  - name: powerable-db
+    plan: free
+    databaseName: powerable
+    user: powerable

@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — Add Smart Outlet{% endblock %}
+
+{% block content %}
+<div class="page page-narrow">
+  <a class="back-link" href="{{ url_for('devices.index') }}">
+    {{ icon('arrow-left') }} My outlets
+  </a>
+
+  <section class="page-heading">
+    <div class="page-heading-copy">
+      <p class="eyebrow">Device registration</p>
+      <h1>Add Smart Outlet</h1>
+      <p class="page-subtitle">
+        Enter the Device ID printed by the ESP32 Network Controller. PowerAble
+        checks the format, creates a QR link to this server, and assigns a name
+        such as <strong>SmartOutlet 1</strong> when the outlet is registered.
+      </p>
+    </div>
+    <div class="heading-meta">
+      <span class="status-pill is-waiting">
+        <span class="dot"></span> LAN registration
+      </span>
+      <span class="heading-note">Format: PA-ESP32-XXXXXXXXXXXX</span>
+    </div>
+  </section>
+
+  {% if error %}
+    <div class="form-error" role="alert">
+      {{ icon('alert') }}
+      <div>
+        <strong>Registration could not continue.</strong>
+        <p>{{ error }}</p>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="add-outlet-layout">
+    <form class="content-card glass-panel add-outlet-form" method="post"
+          action="{{ url_for('devices.add') }}" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <div class="section-label">
+        <span>{{ icon('plug') }} ESP32 Device ID</span>
+        <span class="tag tag-muted">MAC based</span>
+      </div>
+
+      <label class="field">
+        Device ID
+        <input type="text" name="device_id" value="{{ device_id }}" required
+               placeholder="PA-ESP32-A8F291C42D10" maxlength="64"
+               autocapitalize="characters" autocomplete="off" spellcheck="false"
+               pattern="[Pp][Aa]-[Ee][Ss][Pp]32-[0-9A-Fa-f]{12}"
+               title="PA-ESP32- followed by 12 hexadecimal characters" autofocus>
+      </label>
+      <p class="panel-note">
+        Copy the ID from the Arduino Serial Monitor. Leading dashes, spaces,
+        and lowercase letters are normalised; the final 12 characters must be
+        hexadecimal.
+      </p>
+
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary" name="action" value="preview">
+          {{ icon('qr') }} Generate QR code
+        </button>
+        <button type="submit" class="btn btn-glass" name="action" value="register">
+          {{ icon('plus') }} Register on this computer
+        </button>
+      </div>
+      <p class="panel-note">
+        Generating the QR code does not register anything yet. The outlet is
+        added when the QR link is opened by a signed-in account, or when you
+        choose “Register on this computer”.
+      </p>
+    </form>
+
+    <aside class="content-card glass-panel add-outlet-help">
+      <div class="section-label">
+        <span>{{ icon('wifi') }} Same network required</span>
+      </div>
+      <p>
+        The QR code points to this computer's local network address, never
+        <code>localhost</code>. Your phone, the ESP32, and this server must be
+        connected to the same Wi-Fi router.
+      </p>
+      <ol class="steps">
+        <li><strong>Find the ID.</strong> Open the Serial Monitor and wait for the network controller to print its Device ID.</li>
+        <li><strong>Generate.</strong> Paste the ID and create the QR link.</li>
+        <li><strong>Scan.</strong> Open the link on a phone signed in to your PowerAble account.</li>
+        <li><strong>Connect.</strong> The ESP32 heartbeat updates IP, relay, and hardware status.</li>
+      </ol>
+      <p class="panel-note">
+        {{ icon('shield') }}
+        Device IDs are not secrets, but only registered IDs may send heartbeats.
+      </p>
+    </aside>
+  </div>
+
+  {% if registration_url %}
+    <section class="qr-panel glass-panel" aria-labelledby="qr-title">
+      <div class="qr-panel-head">
+        <div>
+          <p class="eyebrow">Ready to scan</p>
+          <h2 id="qr-title">{{ device_id }}</h2>
+          <p class="panel-note">Point a phone camera at the code. Registration happens on the local server, not inside the QR image.</p>
+        </div>
+        <span class="tag">PNG · no-store</span>
+      </div>
+
+      <div class="qr-body">
+        <figure class="qr-preview">
+          <img src="{{ qr_image_url }}" width="260" height="260"
+               alt="Registration QR code for {{ device_id }}">
+          <figcaption>Registration QR</figcaption>
+        </figure>
+
+        <div class="qr-details">
+          <div>
+            <span class="meta-label">Registration link</span>
+            <code class="qr-url">{{ registration_url }}</code>
+          </div>
+
+          <div class="qr-actions">
+            <a class="btn btn-primary" href="{{ qr_image_url }}?download=1">
+              {{ icon('qr') }} Download PNG
+            </a>
+            <a class="btn btn-glass" href="{{ registration_url }}">
+              {{ icon('check') }} Open registration link
+            </a>
+          </div>
+
+          <form method="post" action="{{ url_for('devices.add') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="device_id" value="{{ device_id }}">
+            <input type="hidden" name="action" value="register">
+            <button type="submit" class="btn btn-ghost btn-block">
+              {{ icon('plus') }} Register this outlet now
+            </button>
+          </form>
+
+          <p class="panel-note">
+            After registration, power the outlet and let it send a heartbeat.
+            The dashboard will then show its local IP, relay state, hardware
+            controller link, and last communication time.
+          </p>
+        </div>
+      </div>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}

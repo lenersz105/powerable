@@ -1,0 +1,222 @@
+"""JSON API: secure QR pairing, owner-scoped reads, and heartbeats.
+
+Endpoints:
+    POST /api/pairing/validate
+    POST /api/pairing/register
+    GET  /api/devices
+    GET  /api/devices/<device_id>
+    POST /api/device/heartbeat
+
+Browser pairing/read requests require an authenticated session and, for
+mutations, a valid CSRF token in the X-CSRF-Token header. The heartbeat is
+a machine-to-machine endpoint that requires the shared ``X-Device-Key``
+header (see app/device_auth.py) and still refuses any device ID that has not
+already been registered from the website.
+
+Neither pairing codes nor the device API key are echoed in responses or logs.
+"""
+
+import time
+
+from flask import Blueprint, jsonify, request, session
+from flask_login import current_user, login_required
+
+from app.device_auth import require_device_key
+from app.services import device_service
+from app.services.device_service import PairingError
+
+api_bp = Blueprint("api", __name__)
+
+ATTEMPT_WINDOW_SECONDS = 600
+MAX_PAIRING_FAILURES = 12
+ATTEMPTS_KEY = "pairing_failures"
+MAX_PAYLOAD_LENGTH = 512
+MAX_FIELD_LENGTH = 128
+
+
+def _error(error, status=None):
+    return (
+        jsonify(ok=False, error=error.code, message=error.message),
+        status or error.status,
+    )
+
+
+def _json_body():
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return None
+    return data
+
+
+def _credentials_from(data):
+    """Pull payload or manual fields from a JSON object."""
+
+    if data is None:
+        raise PairingError(
+            "Send a JSON body with a QR payload or device credentials.",
+            status=400,
+            code="invalid_request",
+        )
+
+    payload = data.get("payload")
+    device_id = data.get("device_id")
+    pairing_code = data.get("pairing_code")
+
+    if payload is not None and not isinstance(payload, str):
+        raise PairingError("The QR payload must be text.", status=400, code="invalid_request")
+    if payload and len(payload) > MAX_PAYLOAD_LENGTH:
+        raise PairingError("That QR payload is too long.", status=400, code="invalid_request")
+    if device_id is not None and not isinstance(device_id, str):
+        raise PairingError("The device ID must be text.", status=400, code="invalid_request")
+    if pairing_code is not None and not isinstance(pairing_code, str):
+        raise PairingError("The pairing code must be text.", status=400, code="invalid_request")
+    if device_id and len(device_id) > MAX_FIELD_LENGTH:
+        raise PairingError("That device ID is too long.", status=400, code="invalid_request")
+    if pairing_code and len(pairing_code) > MAX_FIELD_LENGTH:
+        raise PairingError("That pairing code is too long.", status=400, code="invalid_request")
+
+    return {
+        "payload": payload.strip() if payload else None,
+        "device_id": device_id.strip() if device_id else None,
+        "pairing_code": pairing_code.strip() if pairing_code else None,
+    }
+
+
+def _recent_failures():
+    now = time.time()
+    attempts = [
+        stamp
+        for stamp in session.get(ATTEMPTS_KEY, [])
+        if isinstance(stamp, (int, float)) and now - stamp < ATTEMPT_WINDOW_SECONDS
+    ]
+    session[ATTEMPTS_KEY] = attempts
+    return attempts
+
+
+def _record_failure():
+    session[ATTEMPTS_KEY] = _recent_failures() + [time.time()]
+
+
+def _clear_failures():
+    session.pop(ATTEMPTS_KEY, None)
+
+
+def _throttled():
+    if len(_recent_failures()) >= MAX_PAIRING_FAILURES:
+        return (
+            jsonify(
+                ok=False,
+                error="too_many_attempts",
+                message="Too many pairing attempts. Wait ten minutes and try again.",
+            ),
+            429,
+        )
+    return None
+
+
+@api_bp.after_request
+def _no_store(response):
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
+@api_bp.post("/pairing/validate")
+@login_required
+def validate_pairing_code():
+    """Validate a QR payload without claiming the device."""
+
+    throttled = _throttled()
+    if throttled:
+        return throttled
+
+    try:
+        credentials = _credentials_from(_json_body())
+        outlet = device_service.validate_pairing(**credentials)
+    except PairingError as error:
+        _record_failure()
+        return _error(error)
+
+    _clear_failures()
+    return jsonify(
+        ok=True,
+        can_register=True,
+        device=device_service.serialize_outlet(outlet),
+    )
+
+
+@api_bp.post("/pairing/register")
+@login_required
+def register_outlet():
+    """Claim the outlet for the signed-in account (single-use code)."""
+
+    throttled = _throttled()
+    if throttled:
+        return throttled
+
+    try:
+        credentials = _credentials_from(_json_body())
+        outlet = device_service.register_outlet(current_user, **credentials)
+    except PairingError as error:
+        _record_failure()
+        return _error(error)
+
+    _clear_failures()
+    return (
+        jsonify(
+            ok=True,
+            message="Smart outlet registered.",
+            device=device_service.serialize_outlet(outlet),
+        ),
+        201,
+    )
+
+
+@api_bp.post("/device/heartbeat")
+@require_device_key
+def device_heartbeat():
+    """Update a registered outlet from an authenticated ESP32 heartbeat.
+
+    Hardware has no browser session, so this endpoint uses the shared
+    ``X-Device-Key`` header instead of login/CSRF (exempted in
+    app/security.py). The service layer still only updates devices that
+    already exist and are registered; the key never bypasses ownership.
+    """
+
+    try:
+        outlet = device_service.process_heartbeat(_json_body())
+    except PairingError as error:
+        return _error(error)
+
+    return jsonify(
+        ok=True,
+        message="Heartbeat accepted.",
+        device=device_service.serialize_outlet(outlet),
+    )
+
+
+@api_bp.get("/devices")
+@login_required
+def list_devices():
+    outlets = device_service.get_user_outlets(current_user.id)
+    return jsonify(
+        ok=True,
+        devices=[device_service.serialize_outlet(outlet) for outlet in outlets],
+    )
+
+
+@api_bp.get("/devices/<device_id>")
+@login_required
+def get_device(device_id):
+    outlet = device_service.get_user_outlet(current_user.id, device_id)
+    if outlet is None:
+        # 404 for both "does not exist" and "belongs to someone else" so
+        # ownership is not disclosed.
+        return (
+            jsonify(
+                ok=False,
+                error="not_found",
+                message="That outlet is not registered to your account.",
+            ),
+            404,
+        )
+    return jsonify(ok=True, device=device_service.serialize_outlet(outlet))

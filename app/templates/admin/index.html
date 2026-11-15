@@ -1,0 +1,142 @@
+{% extends "admin/base_admin.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block admin_title %}Administration{% endblock %}
+{% block admin_subtitle %}
+  Full installer authority over pairing labels, outlets, and accounts. Every change is audited.
+{% endblock %}
+
+{% block admin_actions %}
+  <a class="btn btn-primary" href="{{ url_for('admin.new_outlet') }}">
+    {{ icon('qr') }} Generate QR label
+  </a>
+  <span class="heading-note">{{ stats.outlets }} total outlets</span>
+{% endblock %}
+
+{% block admin_content %}
+<section class="admin-stat-grid" aria-label="System totals">
+  <article class="admin-stat">
+    <span class="admin-stat-label">Accounts</span>
+    <strong class="admin-stat-value">{{ stats.users }}</strong>
+    <span class="admin-stat-note">{{ stats.admins }} admin · {{ stats.disabled_users }} disabled</span>
+  </article>
+  <article class="admin-stat">
+    <span class="admin-stat-label">Outlets</span>
+    <strong class="admin-stat-value">{{ stats.outlets }}</strong>
+    <span class="admin-stat-note">{{ stats.registered }} registered</span>
+  </article>
+  <article class="admin-stat">
+    <span class="admin-stat-label">Pairing labels</span>
+    <strong class="admin-stat-value">{{ stats.available }}</strong>
+    <span class="admin-stat-note">{{ stats.revoked }} revoked</span>
+  </article>
+  <article class="admin-stat">
+    <span class="admin-stat-label">Reporting hardware</span>
+    <strong class="admin-stat-value">{{ stats.reporting }}</strong>
+    <span class="admin-stat-note">Only confirmed telemetry counts</span>
+  </article>
+  <article class="admin-stat">
+    <span class="admin-stat-label">Admin actions</span>
+    <strong class="admin-stat-value">{{ stats.admin_actions }}</strong>
+    <span class="admin-stat-note">Audited operations</span>
+  </article>
+  <article class="admin-stat">
+    <span class="admin-stat-label">Device events</span>
+    <strong class="admin-stat-value">{{ stats.device_events }}</strong>
+    <span class="admin-stat-note">Provisioned · registered · revoked</span>
+  </article>
+</section>
+
+<div class="admin-two-col">
+  <section class="content-card">
+    <div class="card-heading">
+      <h2>Recent admin actions</h2>
+      <p>The newest changes made through this console or the installer CLI.</p>
+    </div>
+    {% if actions %}
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Action</th><th>Target</th><th>By</th><th>When</th></tr>
+          </thead>
+          <tbody>
+            {% for action in actions %}
+              <tr>
+                <td>{{ action.action }}</td>
+                <td>{{ action.target }}</td>
+                <td>{{ action.actor_name }}</td>
+                <td>{{ action.created_at.strftime('%d %b, %H:%M') }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="admin-empty">No admin actions recorded yet.</p>
+    {% endif %}
+    <p class="panel-note">
+      <a href="{{ url_for('admin.activity') }}">Open the full activity log</a>
+    </p>
+  </section>
+
+  <section class="content-card">
+    <div class="card-heading">
+      <h2>Quick actions</h2>
+      <p>Common installer tasks.</p>
+    </div>
+    <div class="admin-quick-grid">
+      <a class="admin-quick" href="{{ url_for('admin.new_outlet') }}">
+        <span class="admin-quick-icon">{{ icon('qr') }}</span>
+        <strong>Generate a QR label</strong>
+        <span>Create a single-use pairing code.</span>
+      </a>
+      <a class="admin-quick" href="{{ url_for('admin.outlets') }}">
+        <span class="admin-quick-icon">{{ icon('plug') }}</span>
+        <strong>Manage outlets</strong>
+        <span>Rename, rotate, revoke, or delete.</span>
+      </a>
+      <a class="admin-quick" href="{{ url_for('admin.users') }}">
+        <span class="admin-quick-icon">{{ icon('user') }}</span>
+        <strong>Manage accounts</strong>
+        <span>Roles, status, passwords.</span>
+      </a>
+      <a class="admin-quick" href="{{ url_for('admin.activity') }}">
+        <span class="admin-quick-icon">{{ icon('activity') }}</span>
+        <strong>Review activity</strong>
+        <span>Admin and device history.</span>
+      </a>
+    </div>
+    <p class="panel-note">
+      Admins cannot change their own role or status, and at least one active admin must remain.
+    </p>
+  </section>
+</div>
+
+<section class="content-card">
+  <div class="card-heading">
+    <h2>Recent device events</h2>
+    <p>Lifecycle records created by real provisioning and pairing actions.</p>
+  </div>
+  {% if events %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Event</th><th>Device</th><th>Description</th><th>When</th></tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td>{{ event.event_type }}</td>
+              <td>{{ event.outlet.device_uid if event.outlet else '—' }}</td>
+              <td>{{ event.description }}</td>
+              <td>{{ event.created_at.strftime('%d %b, %H:%M') }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="admin-empty">No device events yet. Generate a label to begin.</p>
+  {% endif %}
+</section>
+{% endblock %}

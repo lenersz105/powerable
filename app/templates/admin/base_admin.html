@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block extra_css %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="page admin-page">
+  <section class="page-heading admin-heading">
+    <div class="page-heading-copy">
+      <p class="eyebrow">Admin console</p>
+      <h1>{% block admin_title %}Administration{% endblock %}</h1>
+      <p class="page-subtitle">{% block admin_subtitle %}Installer tools for labels, outlets, and accounts.{% endblock %}</p>
+    </div>
+    <div class="heading-meta">
+      {% block admin_actions %}{% endblock %}
+    </div>
+  </section>
+
+  {% include "admin/_nav.html" %}
+
+  {% block admin_content %}{% endblock %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/admin.js') }}" defer></script>
+{% endblock %}

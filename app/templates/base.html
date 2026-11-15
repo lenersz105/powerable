@@ -1,0 +1,140 @@
+{% from "partials/icons.html" import icon %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#06101f">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}PowerAble{% endblock %}</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='icons/favicon.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="app-body">
+  <a class="skip-link" href="#main-content">Skip to content</a>
+
+  <header class="site-header">
+    <nav class="navbar glass-bar" aria-label="Primary navigation">
+      <a class="brand" href="{{ url_for('main.index') }}" aria-label="PowerAble home">
+        <span class="brand-mark">{{ icon('bolt') }}</span>
+        <span class="brand-text">Power<span>Able</span></span>
+      </a>
+
+      <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="primary-nav" data-nav-toggle>
+        <span class="sr-only">Toggle navigation</span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+        <span class="nav-toggle-bar"></span>
+      </button>
+
+      <div class="nav-panel" id="primary-nav" data-nav-panel>
+        <ul class="nav-links">
+          <li>
+            <a href="{{ url_for('main.index') }}"
+               {% if request.endpoint == 'main.index' %}class="is-active" aria-current="page"{% endif %}>Home</a>
+          </li>
+          <li>
+            <a href="{{ url_for('automation.index') }}"
+               {% if request.endpoint == 'automation.index' %}class="is-active" aria-current="page"{% endif %}>Scheduling</a>
+          </li>
+          <li>
+            <a href="{{ url_for('dashboard.index') }}"
+               {% if request.endpoint == 'dashboard.index' %}class="is-active" aria-current="page"{% endif %}>Live Dashboard</a>
+          </li>
+          <li>
+            <a href="{{ url_for('main.manual') }}"
+               {% if request.endpoint == 'main.manual' %}class="is-active" aria-current="page"{% endif %}>User Manual</a>
+          </li>
+          <li>
+            <a href="{{ url_for('main.about') }}"
+               {% if request.endpoint == 'main.about' %}class="is-active" aria-current="page"{% endif %}>About the Project</a>
+          </li>
+          {% if current_user.is_authenticated and current_user.is_admin %}
+            <li>
+              <a href="{{ url_for('admin.index') }}"
+                 {% if request.blueprint == 'admin' %}class="is-active" aria-current="page"{% endif %}>Admin</a>
+            </li>
+          {% endif %}
+        </ul>
+
+        <div class="nav-meta">
+          {% if current_user.is_authenticated %}
+            <span class="user-chip" title="Signed in account">
+              <span class="user-avatar" aria-hidden="true">{{ current_user.username[0]|upper }}</span>
+              <span class="user-name">{{ current_user.username }}</span>
+            </span>
+            <form class="logout-form" action="{{ url_for('auth.logout') }}" method="post">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-ghost btn-sm">
+                {{ icon('logout') }} Sign out
+              </button>
+            </form>
+          {% else %}
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('auth.login') }}">Sign in</a>
+            <a class="btn btn-primary btn-sm" href="{{ url_for('auth.register') }}">Create account</a>
+          {% endif %}
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main class="app-main" id="main-content">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-stack" role="status" aria-live="polite">
+          {% for category, message in messages %}
+            <div class="flash flash-{{ category }}">
+              {{ icon('check' if category == 'success' else ('alert' if category == 'error' else 'info')) }}
+              <span>{{ message }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-inner">
+      <p>PowerAble · Web-Based Smart Power Outlet</p>
+      <p class="footer-note">Local network only · No cloud services · Thesis project</p>
+    </div>
+  </footer>
+
+  <nav class="mobile-dock" aria-label="Mobile navigation">
+    <a class="dock-item {% if request.endpoint == 'main.index' %}is-active{% endif %}"
+       href="{{ url_for('main.index') }}">
+      {{ icon('home') }}<span>Home</span>
+    </a>
+    <a class="dock-item {% if request.endpoint == 'dashboard.index' %}is-active{% endif %}"
+       href="{{ url_for('dashboard.index') }}">
+      {{ icon('activity') }}<span>Live</span>
+    </a>
+    <a class="dock-add {% if request.endpoint in ['devices.add', 'devices.pair'] %}is-active{% endif %}"
+       href="{{ url_for('devices.add') }}" aria-label="Add Smart Outlet">
+      {{ icon('plus') }}<span>Add</span>
+    </a>
+    <a class="dock-item {% if request.endpoint == 'devices.index' %}is-active{% endif %}"
+       href="{{ url_for('devices.index') }}">
+      {{ icon('plug') }}<span>Outlets</span>
+    </a>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+      <a class="dock-item {% if request.blueprint == 'admin' %}is-active{% endif %}"
+         href="{{ url_for('admin.index') }}">
+        {{ icon('shield') }}<span>Admin</span>
+      </a>
+    {% else %}
+      <a class="dock-item {% if request.endpoint == 'automation.index' %}is-active{% endif %}"
+         href="{{ url_for('automation.index') }}">
+        {{ icon('calendar') }}<span>Schedules</span>
+      </a>
+    {% endif %}
+  </nav>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+  {% block extra_js %}{% endblock %}
+</body>
+</html>

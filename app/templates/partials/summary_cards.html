@@ -1,0 +1,49 @@
+{% from "partials/icons.html" import icon %}
+<section class="summary-grid" aria-label="Overview summary">
+  <article class="summary-card accent-cyan glass-panel">
+    <div class="summary-icon">{{ icon('bolt') }}</div>
+    <p class="summary-label">Total Load</p>
+    <p class="summary-value is-unavailable">
+      <span data-summary="total-load">0.00</span><span class="summary-unit">W</span>
+    </p>
+    <p class="summary-state"><span class="dot is-waiting"></span> No verified telemetry yet</p>
+  </article>
+
+  <article class="summary-card accent-blue glass-panel">
+    <div class="summary-icon">{{ icon('power') }}</div>
+    <p class="summary-label">Outlets ON</p>
+    <p class="summary-value">
+      <span data-summary="outlets-on">{{ counts.on }} / {{ counts.total }}</span>
+    </p>
+    <p class="summary-state">
+      <span class="dot {{ 'is-online' if counts.on else 'is-waiting' }}"></span>
+      {{ 'Confirmed by relay feedback' if counts.on else 'No relay confirmation' }}
+    </p>
+  </article>
+
+  <article class="summary-card accent-orange glass-panel">
+    <div class="summary-icon">{{ icon('battery') }}</div>
+    <p class="summary-label">Session Energy</p>
+    <p class="summary-value is-unavailable">
+      <span data-summary="session-energy">0.000</span><span class="summary-unit">kWh</span>
+    </p>
+    <p class="summary-state"><span class="dot is-waiting"></span> Not measured yet</p>
+  </article>
+
+  <article class="summary-card accent-purple glass-panel">
+    <div class="summary-icon">{{ icon('wifi') }}</div>
+    <p class="summary-label">Network Status</p>
+    <p class="summary-value is-text">
+      <span data-summary="network-status">
+        {%- if counts.total == 0 -%}No outlets
+        {%- elif counts.reporting == 0 -%}Waiting for data
+        {%- else -%}Local
+        {%- endif -%}
+      </span>
+    </p>
+    <p class="summary-state">
+      <span class="dot {{ 'is-online' if counts.reporting else 'is-waiting' }}"></span>
+      {{ counts.reporting }} of {{ counts.total }} reporting
+    </p>
+  </article>
+</section>

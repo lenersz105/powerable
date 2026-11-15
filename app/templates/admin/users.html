@@ -1,0 +1,156 @@
+{% extends "admin/base_admin.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block admin_title %}Accounts{% endblock %}
+{% block admin_subtitle %}
+  Roles, account status, and password resets. Disabled accounts lose access immediately.
+{% endblock %}
+
+{% block admin_actions %}
+  <span class="heading-note">{{ stats.users }} accounts · {{ stats.admins }} admin</span>
+{% endblock %}
+
+{% block admin_content %}
+<form class="admin-filter-bar glass-panel" method="get" action="{{ url_for('admin.users') }}">
+  <label class="field">
+    Search
+    <input type="search" name="search" value="{{ search }}" maxlength="80"
+           placeholder="Username" autocomplete="off">
+  </label>
+  <div class="form-actions">
+    <button class="btn btn-primary" type="submit">{{ icon('user') }} Filter</button>
+    {% if search %}
+      <a class="btn btn-ghost" href="{{ url_for('admin.users') }}">Reset</a>
+    {% endif %}
+  </div>
+</form>
+
+{% if users %}
+  <div class="admin-user-list">
+    {% for user in users %}
+      {% set is_self = user.id == current_user.id %}
+      <article class="admin-user-card glass-panel">
+        <header class="admin-user-head">
+          <div class="admin-user-title">
+            <span class="user-avatar" aria-hidden="true">{{ user.username[0]|upper }}</span>
+            <div>
+              <h2>{{ user.username }}</h2>
+              <p>Joined {{ user.created_at.strftime('%d %b %Y') }} · {{ user.outlets|length }} outlet(s)</p>
+            </div>
+          </div>
+          <div class="admin-user-tags">
+            <span class="tag {{ 'admin-tag-warn' if user.is_admin else 'tag-muted' }}">{{ user.role }}</span>
+            <span class="tag {{ 'admin-tag-danger' if not user.is_active else 'tag-muted' }}">{{ user.is_active_flag }}</span>
+            {% if is_self %}<span class="tag">current account</span>{% endif %}
+          </div>
+        </header>
+
+        <details class="admin-outlet-tools">
+          <summary>{{ icon('menu') }} Manage {{ user.username }}</summary>
+
+          <div class="admin-tool-grid">
+            <section class="admin-tool">
+              <h3>Role</h3>
+              {% if is_self %}
+                <p class="admin-tool-note">You cannot change your own role. Ask another admin.</p>
+              {% else %}
+                <form class="form-grid" method="post"
+                      action="{{ url_for('admin.set_role', user_id=user.id) }}"
+                      data-confirm="Change {{ user.username }}'s role?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="field">
+                    Assigned role
+                    <select name="role">
+                      <option value="user" {% if user.role == 'user' %}selected{% endif %}>user</option>
+                      <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>admin</option>
+                    </select>
+                  </label>
+                  <div class="form-actions">
+                    <button class="btn btn-glass btn-sm" type="submit">Update role</button>
+                  </div>
+                </form>
+              {% endif %}
+            </section>
+
+            <section class="admin-tool">
+              <h3>Account status</h3>
+              {% if is_self %}
+                <p class="admin-tool-note">You cannot disable your own account.</p>
+              {% else %}
+                <form class="form-grid" method="post"
+                      action="{{ url_for('admin.set_status', user_id=user.id) }}"
+                      data-confirm="Change {{ user.username }}'s account status?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="field">
+                    Status
+                    <select name="status">
+                      <option value="active" {% if user.is_active_flag == 'active' %}selected{% endif %}>active</option>
+                      <option value="disabled" {% if user.is_active_flag == 'disabled' %}selected{% endif %}>disabled</option>
+                    </select>
+                  </label>
+                  <div class="form-actions">
+                    <button class="btn btn-glass btn-sm" type="submit">Update status</button>
+                  </div>
+                </form>
+                <p class="admin-tool-note">A disabled account is signed out on its next request.</p>
+              {% endif %}
+            </section>
+
+            <section class="admin-tool">
+              <h3>Reset password</h3>
+              <form class="form-grid" method="post"
+                    action="{{ url_for('admin.reset_password', user_id=user.id) }}"
+                    data-confirm="Replace {{ user.username }}'s password?">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="field">
+                  New password
+                  <input type="password" name="password" minlength="8" maxlength="128"
+                         required autocomplete="new-password">
+                </label>
+                <label class="field">
+                  Confirm password
+                  <input type="password" name="confirm_password" minlength="8" maxlength="128"
+                         required autocomplete="new-password">
+                </label>
+                <div class="form-actions">
+                  <button class="btn btn-glass btn-sm" type="submit">Replace password</button>
+                </div>
+              </form>
+              <p class="admin-tool-note">The password is hashed before storage and never appears in logs.</p>
+            </section>
+
+            <section class="admin-tool admin-tool-danger">
+              <h3>Delete account</h3>
+              {% if is_self %}
+                <p class="admin-tool-note">You cannot delete your own account.</p>
+              {% else %}
+                <p class="admin-tool-note">Every outlet owned by this account is revoked first.</p>
+                <form class="form-grid" method="post"
+                      action="{{ url_for('admin.delete_user', user_id=user.id) }}"
+                      data-confirm="Permanently delete {{ user.username }} and revoke their outlets?">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <label class="field">
+                    Type <strong>{{ user.username }}</strong> to confirm
+                    <input type="text" name="confirm_username" required maxlength="80"
+                           autocomplete="off" spellcheck="false" autocapitalize="none">
+                  </label>
+                  <div class="form-actions">
+                    <button class="btn btn-danger btn-sm" type="submit">Delete account</button>
+                  </div>
+                </form>
+              {% endif %}
+            </section>
+          </div>
+        </details>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <section class="content-card admin-empty-panel">
+    <span class="admin-quick-icon">{{ icon('user') }}</span>
+    <h2>No accounts match this search.</h2>
+    <p>Try a different username, or clear the filter.</p>
+    <a class="btn btn-ghost" href="{{ url_for('admin.users') }}">Clear filter</a>
+  </section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — Add Smart Outlet{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/scanner.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="page page-narrow"
+     data-pairing-page
+     data-validate-url="{{ url_for('api.validate_pairing_code') }}"
+     data-register-url="{{ url_for('api.register_outlet') }}"
+     data-dashboard-url="{{ url_for('main.index') }}">
+
+  <a class="back-link" href="{{ url_for('devices.index') }}">
+    {{ icon('arrow-left') }} My outlets
+  </a>
+
+  <section class="page-heading">
+    <div class="page-heading-copy">
+      <p class="eyebrow">Pair a device</p>
+      <h1>Add Smart Outlet</h1>
+      <p class="page-subtitle">
+        Point your phone at the QR label on the outlet. The server checks that the code is valid
+        and not already claimed before anything is added to your account.
+      </p>
+    </div>
+    <div class="heading-meta">
+      <span class="status-pill is-waiting" data-permission-pill>
+        <span class="dot"></span> <span data-permission-label>Camera off</span>
+      </span>
+      <span class="heading-note">Single-use pairing code</span>
+    </div>
+  </section>
+
+  <div class="security-banner" data-secure-warning hidden>
+    {{ icon('lock') }}
+    <div>
+      <strong>Camera access needs a secure connection.</strong>
+      <p>
+        Phones only allow the camera on <code>https://</code> pages (or <code>localhost</code>).
+        Open PowerAble using the local HTTPS address from the User Manual, or enter the device
+        credentials manually below.
+        <a href="{{ url_for('main.manual') }}#camera">Camera &amp; QR setup</a>
+      </p>
+    </div>
+  </div>
+
+  <section class="scanner-shell glass-panel" data-scanner>
+    <div class="scanner-head">
+      <div>
+        <h2>Scan outlet label</h2>
+        <p class="panel-note">Position the QR code inside the frame.</p>
+      </div>
+      <span class="scanner-state" data-camera-state aria-live="polite">Camera off</span>
+    </div>
+
+    <div class="camera-stage" data-camera-stage>
+      <video class="camera-video" data-camera-video playsinline muted autoplay
+             aria-label="Rear camera preview"></video>
+
+      <div class="camera-placeholder" data-camera-placeholder>
+        <span class="camera-placeholder-icon">{{ icon('camera') }}</span>
+        <strong>Camera preview</strong>
+        <p>Tap Start camera and allow permission when your browser asks.</p>
+      </div>
+
+      <div class="scan-frame" aria-hidden="true">
+        <span class="scan-corner tl"></span>
+        <span class="scan-corner tr"></span>
+        <span class="scan-corner bl"></span>
+        <span class="scan-corner br"></span>
+        <span class="scan-line"></span>
+      </div>
+
+      <p class="camera-hint" data-camera-hint>Hold the phone steady and keep the whole label visible.</p>
+    </div>
+
+    <div class="scanner-messages">
+      <p class="scanner-message" data-scanner-message role="status" aria-live="polite">
+        Ready when you are.
+      </p>
+      <p class="scanner-error" data-scanner-error role="alert" hidden></p>
+    </div>
+
+    <div class="scanner-controls">
+      <button type="button" class="btn btn-primary" data-start-camera>
+        {{ icon('camera') }} Start camera
+      </button>
+      <button type="button" class="btn btn-glass" data-stop-camera hidden>
+        {{ icon('camera-off') }} Stop
+      </button>
+      <button type="button" class="btn btn-glass" data-torch hidden aria-pressed="false">
+        {{ icon('flashlight') }} Flashlight
+      </button>
+      <button type="button" class="btn btn-glass" data-switch-camera hidden>
+        {{ icon('switch-camera') }} Switch camera
+      </button>
+      <a class="btn btn-ghost" href="{{ url_for('devices.index') }}">Cancel</a>
+    </div>
+
+    <p class="scanner-footnote">
+      {{ icon('shield') }}
+      The camera feed stays on this device. Frames are decoded in the browser; only the QR text is
+      sent to your local Flask server for validation.
+    </p>
+  </section>
+
+  <details class="manual-panel glass-panel" data-manual-panel>
+    <summary>
+      {{ icon('qr') }} Enter device details manually
+      {{ icon('chevron', 'icon chevron') }}
+    </summary>
+    <div class="manual-body">
+      <p class="panel-note">
+        No camera or HTTPS? Type the values printed on the outlet label. The same server
+        validation applies.
+      </p>
+      <form class="manual-form" data-manual-form novalidate>
+        <label class="field">
+          Device ID
+          <input type="text" name="device_id" placeholder="PA-ESP32-0001"
+                 autocapitalize="characters" spellcheck="false" maxlength="64" required>
+        </label>
+        <label class="field">
+          Pairing code
+          <input type="text" name="pairing_code" placeholder="XXXX-XXXX-XXXX"
+                 autocapitalize="characters" spellcheck="false" maxlength="64" required>
+        </label>
+        <button type="submit" class="btn btn-primary">Check device</button>
+      </form>
+      <p class="manual-error" data-manual-error role="alert" hidden></p>
+    </div>
+  </details>
+
+  <section class="pair-note glass-panel">
+    <h2>What happens next?</h2>
+    <ol class="steps">
+      <li><strong>Identify.</strong> The QR code is read and checked on the server.</li>
+      <li><strong>Confirm.</strong> You see the device ID and type before registering anything.</li>
+      <li><strong>Register.</strong> The outlet is linked to your account and the code is consumed.</li>
+      <li><strong>Connect later.</strong> Wi-Fi provisioning and telemetry are separate, not-yet-implemented steps.</li>
+    </ol>
+    <p class="panel-note">
+      Registering does not put the outlet online, and no Wi-Fi password is ever stored in a QR code.
+    </p>
+  </section>
+</div>
+
+<div class="pair-sheet" data-confirm-sheet hidden>
+  <div class="pair-sheet-backdrop" data-confirm-cancel></div>
+  <section class="pair-sheet-panel glass-panel" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
+    <div class="pair-sheet-head">
+      <span class="sheet-icon">{{ icon('qr') }}</span>
+      <div>
+        <p class="eyebrow">Valid label</p>
+        <h2 id="confirm-title">PowerAble device found</h2>
+      </div>
+      <button type="button" class="icon-button" data-confirm-cancel aria-label="Close">
+        {{ icon('x') }}
+      </button>
+    </div>
+
+    <dl class="confirm-list">
+      <div><dt>Device ID</dt><dd data-confirm-device-id>—</dd></div>
+      <div><dt>Device type</dt><dd data-confirm-device-type>—</dd></div>
+      <div><dt>Registration status</dt><dd><span class="tag" data-confirm-status>Available</span></dd></div>
+    </dl>
+
+    <p class="pair-sheet-warning">
+      {{ icon('info') }}
+      Registering links this outlet to <strong>{{ current_user.username }}</strong>. The pairing
+      code will stop working immediately after registration.
+    </p>
+
+    <p class="confirm-error" data-confirm-error role="alert" hidden></p>
+
+    <div class="pair-sheet-actions">
+      <button type="button" class="btn btn-primary btn-block" data-confirm-register>
+        {{ icon('check') }} Register This Outlet
+      </button>
+      <button type="button" class="btn btn-ghost btn-block" data-confirm-cancel>Cancel</button>
+    </div>
+  </section>
+</div>
+
+<div class="pair-sheet" data-success-sheet hidden>
+  <div class="pair-sheet-backdrop"></div>
+  <section class="pair-sheet-panel glass-panel is-success" role="dialog" aria-modal="true" aria-labelledby="success-title">
+    <div class="success-mark">{{ icon('check') }}</div>
+    <p class="eyebrow">Registration complete</p>
+    <h2 id="success-title">Smart Outlet Registered</h2>
+    <p>Your smart outlet has been added to your PowerAble account.</p>
+    <p class="success-device"><strong data-success-name>Outlet</strong> <span data-success-id></span></p>
+    <p class="panel-note">
+      Its measurements will stay at zero until the ESP32-S3 is provisioned on Wi-Fi and starts
+      sending verified telemetry.
+    </p>
+    <div class="pair-sheet-actions">
+      <a class="btn btn-primary btn-block" href="{{ url_for('main.index') }}">
+        Go to Dashboard
+      </a>
+      <a class="btn btn-ghost btn-block" href="{{ url_for('devices.pair') }}">
+        Add another outlet
+      </a>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='vendor/jsQR.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/qr-scanner.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/pairing.js') }}" defer></script>
+{% endblock %}

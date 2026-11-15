@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — {{ title }}{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="error-page glass-panel">
+    <span class="error-code">{{ status }}</span>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <div class="error-actions">
+      <a class="btn btn-primary" href="{{ url_for('main.index') }}">Go to Home</a>
+      <a class="btn btn-ghost" href="{{ url_for('main.manual') }}">Open User Manual</a>
+    </div>
+  </section>
+</div>
+{% endblock %}

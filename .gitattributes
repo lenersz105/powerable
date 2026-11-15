@@ -1,0 +1,7 @@
+# Render runs shell scripts on Linux. Keep them LF even on Windows checkouts.
+*.sh text eol=lf
+
+# Keep the Render Blueprint and Python version files LF as well.
+*.yaml text eol=lf
+*.yml text eol=lf
+.python-version text eol=lf

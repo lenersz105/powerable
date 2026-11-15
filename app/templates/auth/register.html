@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — Create account{% endblock %}
+
+{% block content %}
+<div class="page auth-page">
+  <div class="auth-layout">
+    <section class="auth-card glass-panel">
+      <div class="auth-head">
+        <span class="brand-mark brand-mark-lg">{{ icon('user') }}</span>
+        <div>
+          <p class="eyebrow">New account</p>
+          <h1>Create account</h1>
+          <p class="page-subtitle">Your outlets and their data stay on your local PowerAble server.</p>
+        </div>
+      </div>
+
+      <form class="auth-form" method="post" action="{{ url_for('auth.register') }}" novalidate>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <label class="field">
+          Username
+          <input type="text" name="username" value="{{ values.username }}" required
+                 autocomplete="username" autocapitalize="none" spellcheck="false"
+                 minlength="3" maxlength="32" pattern="[A-Za-z0-9._-]{3,32}" autofocus>
+          <span class="field-hint">3–32 characters: letters, numbers, dot, dash, underscore.</span>
+        </label>
+
+        <label class="field">
+          Password
+          <input type="password" name="password" required autocomplete="new-password"
+                 minlength="8" maxlength="128">
+          <span class="field-hint">At least 8 characters. Stored only as a hash.</span>
+        </label>
+
+        <label class="field">
+          Confirm password
+          <input type="password" name="confirm_password" required autocomplete="new-password"
+                 minlength="8" maxlength="128">
+        </label>
+
+        <button class="btn btn-primary btn-block" type="submit">Create account</button>
+      </form>
+
+      <p class="auth-switch">
+        Already have an account?
+        <a href="{{ url_for('auth.login') }}">Sign in</a>
+      </p>
+    </section>
+
+    <aside class="auth-aside glass-panel">
+      <span class="auth-aside-icon">{{ icon('shield') }}</span>
+      <h2>Secure pairing by design</h2>
+      <ul class="info-list">
+        <li>QR labels contain a device ID and a one-time code — never Wi-Fi passwords.</li>
+        <li>Pairing codes are stored as hashes and stop working after use.</li>
+        <li>Only the account that claims an outlet can see it.</li>
+        <li>Registering a device does not claim it is online.</li>
+      </ul>
+    </aside>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,77 @@
+{% extends "admin/base_admin.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block admin_title %}Admin activity{% endblock %}
+{% block admin_subtitle %}
+  An append-only record of administrative operations and device lifecycle events.
+{% endblock %}
+
+{% block admin_content %}
+<section class="content-card">
+  <div class="card-heading">
+    <h2>Administrative actions</h2>
+    <p>Newest first. Passwords and pairing codes are never recorded here.</p>
+  </div>
+  {% if actions %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>When</th><th>Action</th><th>Target</th><th>By</th><th>Notes</th></tr>
+        </thead>
+        <tbody>
+          {% for action in actions %}
+            <tr>
+              <td>{{ action.created_at.strftime('%d %b %Y, %H:%M') }}</td>
+              <td>{{ action.action }}</td>
+              <td>{{ action.target }}</td>
+              <td>{{ action.actor_name }}</td>
+              <td>{{ action.description or '—' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="admin-empty">No administrative actions have been recorded.</p>
+  {% endif %}
+</section>
+
+<section class="content-card">
+  <div class="card-heading">
+    <h2>Device events</h2>
+    <p>Provisioning, registration, and revocation records for physical outlets.</p>
+  </div>
+  {% if events %}
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>When</th><th>Event</th><th>Device</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+            <tr>
+              <td>{{ event.created_at.strftime('%d %b %Y, %H:%M') }}</td>
+              <td>{{ event.event_type }}</td>
+              <td>{{ event.outlet.device_uid if event.outlet else '—' }}</td>
+              <td>{{ event.description }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="admin-empty">No device events have been recorded.</p>
+  {% endif %}
+</section>
+
+<div class="notice notice-neutral" role="note">
+  {{ icon('info') }}
+  <div>
+    <strong>No fabricated telemetry.</strong>
+    <p>
+      This log records lifecycle actions only. It never marks an outlet online, invents readings,
+      or simulates relay changes.
+    </p>
+  </div>
+</div>
+{% endblock %}

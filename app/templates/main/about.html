@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — About the Project{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="about-hero">
+    <div>
+      <p class="eyebrow">Thesis Project</p>
+      <h1>About PowerAble</h1>
+      <p class="page-subtitle">
+        A web-based smart power outlet for local monitoring, relay control, energy
+        awareness, and scheduling — built to work on a home network without cloud
+        services.
+      </p>
+      <div class="stack-chips" aria-label="Technology stack">
+        <span class="chip">Python</span>
+        <span class="chip">Flask</span>
+        <span class="chip">SQLite</span>
+        <span class="chip">SQLAlchemy</span>
+        <span class="chip">HTML5</span>
+        <span class="chip">CSS3</span>
+        <span class="chip">Vanilla JavaScript</span>
+        <span class="chip">ESP32-S3</span>
+        <span class="chip">PZEM-004T</span>
+      </div>
+    </div>
+    <div class="about-badge">
+      {{ icon('plug') }}
+      <span>Prototype</span>
+      <small>No hardware connected</small>
+    </div>
+  </section>
+
+  <div class="about-grid">
+    <section class="content-card">
+      <div class="card-heading">
+        <div>
+          <h2>Project purpose</h2>
+          <p>Why this system exists.</p>
+        </div>
+      </div>
+      <p>
+        PowerAble explores how an affordable smart outlet can report real electrical
+        measurements, accept confirmed relay commands, and execute schedules entirely
+        on a local network. The project is intended as a thesis prototype, not a
+        commercial product.
+      </p>
+      <ul class="info-list">
+        <li>Measure voltage, current, power, power factor, and energy.</li>
+        <li>Control four independent relay channels.</li>
+        <li>Store historical readings and device events in SQLite.</li>
+        <li>Provide scheduling and session energy limits.</li>
+        <li>Keep all essential functions available without internet access.</li>
+      </ul>
+    </section>
+
+    <section class="content-card">
+      <div class="card-heading">
+        <div>
+          <h2>Current status</h2>
+          <p>An honest snapshot.</p>
+        </div>
+        <span class="tag tag-muted">Stage 2</span>
+      </div>
+      <ul class="status-list">
+        <li><span class="status-dot is-online"></span><div><strong>Web interface</strong><span>Home, Live Dashboard, Scheduling, Manual, About</span></div></li>
+        <li><span class="status-dot is-online"></span><div><strong>Accounts &amp; sessions</strong><span>Register, sign in, hashed passwords, CSRF-protected forms</span></div></li>
+        <li><span class="status-dot is-online"></span><div><strong>Secure QR pairing</strong><span>Single-use codes, ownership checks, device list</span></div></li>
+        <li><span class="status-dot is-online"></span><div><strong>Database schema</strong><span>Users, smart outlets, and device events via migrations</span></div></li>
+        <li><span class="status-dot is-waiting"></span><div><strong>Telemetry &amp; relay API</strong><span>Not implemented — no readings or commands exist yet</span></div></li>
+        <li><span class="status-dot is-offline"></span><div><strong>ESP32-S3 hardware</strong><span>Not connected</span></div></li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="content-card">
+    <div class="card-heading">
+      <div>
+        <h2>Architecture</h2>
+        <p>Modular by design so each part can be understood and tested separately.</p>
+      </div>
+    </div>
+    <div class="arch-grid">
+      <div class="arch-item">
+        <span class="arch-icon">{{ icon('server') }}</span>
+        <strong>Flask routes</strong>
+        <span>Receive requests and return pages or JSON.</span>
+      </div>
+      <div class="arch-item">
+        <span class="arch-icon">{{ icon('gauge') }}</span>
+        <strong>Services</strong>
+        <span>Energy math, device rules, QR pairing.</span>
+      </div>
+      <div class="arch-item">
+        <span class="arch-icon">{{ icon('battery') }}</span>
+        <strong>SQLAlchemy models</strong>
+        <span>Users, outlets, readings, schedules, events.</span>
+      </div>
+      <div class="arch-item">
+        <span class="arch-icon">{{ icon('wifi') }}</span>
+        <strong>Hardware channel</strong>
+        <span>Local network telemetry and commands.</span>
+      </div>
+    </div>
+    <p class="panel-note">
+      Routes never talk to hardware directly. Services translate device messages into
+      database records, and the dashboard only reads confirmed data.
+    </p>
+  </section>
+
+  <div class="about-grid">
+    <section class="content-card">
+      <div class="card-heading">
+        <div>
+          <h2>Data honesty rules</h2>
+          <p>Non-negotiable design constraints.</p>
+        </div>
+      </div>
+      <ul class="info-list">
+        <li>No random or simulated sensor values, ever.</li>
+        <li>Missing data is shown as missing, separate from a real zero.</li>
+        <li>A device is online only after verified communication.</li>
+        <li>Relay status changes only after hardware confirmation.</li>
+        <li>Energy cutoff requires valid, accumulated energy readings.</li>
+        <li>Test data, if used for layout previews, is clearly labelled.</li>
+      </ul>
+    </section>
+
+    <section class="content-card">
+      <div class="card-heading">
+        <div>
+          <h2>Thesis details</h2>
+          <p>To be completed by the author.</p>
+        </div>
+      </div>
+      <dl class="detail-list">
+        <div><dt>Project title</dt><dd>PowerAble: Web-Based Smart Power Outlet</dd></div>
+        <div><dt>Author</dt><dd>To be completed</dd></div>
+        <div><dt>Institution</dt><dd>To be completed</dd></div>
+        <div><dt>Adviser</dt><dd>To be completed</dd></div>
+        <div><dt>Academic year</dt><dd>To be completed</dd></div>
+      </dl>
+    </section>
+  </div>
+
+  <section class="content-card">
+    <div class="card-heading">
+      <div>
+        <h2>Development roadmap</h2>
+        <p>Each stage is completed and verified before the next begins.</p>
+      </div>
+    </div>
+    <ol class="roadmap">
+      <li class="roadmap-item">
+        <span class="roadmap-marker">1</span>
+        <div><strong>Website interface</strong><span>Shared layout, five pages, outlet cards, mobile dock. <em>Complete.</em></span></div>
+      </li>
+      <li class="roadmap-item">
+        <span class="roadmap-marker">2</span>
+        <div><strong>Database, accounts &amp; pairing</strong><span>SQLite models, hashed passwords, single-use QR registration. <em>Complete.</em></span></div>
+      </li>
+      <li class="roadmap-item is-current">
+        <span class="roadmap-marker">3</span>
+        <div><strong>Flask API</strong><span>Pairing and device-read endpoints are live. Telemetry receiving, relay commands, and device status are next. <em>Current stage.</em></span></div>
+      </li>
+      <li class="roadmap-item">
+        <span class="roadmap-marker">4</span>
+        <div><strong>Frontend integration</strong><span>Polling, real controls, live trend charts.</span></div>
+      </li>
+      <li class="roadmap-item">
+        <span class="roadmap-marker">5</span>
+        <div><strong>Scheduling and limits</strong><span>Saved schedules, energy cutoff, history.</span></div>
+      </li>
+      <li class="roadmap-item">
+        <span class="roadmap-marker">6</span>
+        <div><strong>Hardware integration</strong><span>ESP32-S3, PZEM-004T, relay confirmation, TinyML.</span></div>
+      </li>
+    </ol>
+  </section>
+
+  <div class="notice notice-neutral" role="note">
+    {{ icon('info') }}
+    <div>
+      <strong>Prototype disclaimer</strong>
+      <p>
+        PowerAble is an academic prototype. It is not certified for household or
+        commercial electrical use. All mains wiring should be handled only by a
+        qualified person and tested with safe loads first.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

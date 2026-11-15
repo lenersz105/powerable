@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — Home{% endblock %}
+
+{% block content %}
+<div class="page">
+  {% if not current_user.is_authenticated %}
+    <section class="landing-hero glass-panel">
+      <div class="landing-copy">
+        <p class="eyebrow">Web-Based Smart Power Outlet</p>
+        <h1>Your outlets, clearly measured.<br><span>Nothing invented.</span></h1>
+        <p class="page-subtitle">
+          PowerAble runs on your local network. Scan the QR label on a PowerAble outlet,
+          register it to your account, and see only measurements the hardware actually reports.
+        </p>
+        <div class="landing-actions">
+          <a class="btn btn-primary" href="{{ url_for('auth.register') }}">
+            {{ icon('user') }} Create account
+          </a>
+          <a class="btn btn-glass" href="{{ url_for('auth.login') }}">
+            {{ icon('lock') }} Sign in
+          </a>
+        </div>
+        <p class="landing-note">
+          {{ icon('shield') }}
+          Zeros stay marked “awaiting data” until verified telemetry arrives.
+        </p>
+      </div>
+
+      <div class="landing-visual" aria-hidden="true">
+        <div class="floating-card glass-panel">
+          <span class="channel-badge">CH 1</span>
+          <strong>Refrigerator</strong>
+          <div class="visual-metrics">
+            <span>— V</span><span>— A</span><span>— W</span>
+          </div>
+          <p>Preview layout — awaiting real data</p>
+        </div>
+        <div class="floating-card glass-panel is-back">
+          <span class="channel-badge">CH 2</span>
+          <strong>Computer</strong>
+          <div class="visual-metrics">
+            <span>— V</span><span>— A</span><span>— W</span>
+          </div>
+          <p>Preview layout — awaiting real data</p>
+        </div>
+        <div class="scan-orbit">{{ icon('qr') }}</div>
+      </div>
+    </section>
+
+    <section class="landing-features">
+      <article class="feature-card glass-panel">
+        <span class="feature-icon">{{ icon('qr') }}</span>
+        <h2>Scan to register</h2>
+        <p>Use your phone camera to read the outlet's one-time pairing label. Invalid or claimed labels are rejected by the server.</p>
+      </article>
+      <article class="feature-card glass-panel">
+        <span class="feature-icon">{{ icon('gauge') }}</span>
+        <h2>Real readings only</h2>
+        <p>Voltage, current, power, power factor, and energy come from the PZEM-004T through the ESP32-S3. No simulated samples.</p>
+      </article>
+      <article class="feature-card glass-panel">
+        <span class="feature-icon">{{ icon('wifi') }}</span>
+        <h2>Local by design</h2>
+        <p>Flask, SQLite, CSS, and JavaScript are all served from your own machine. No CDN or cloud account is required.</p>
+      </article>
+    </section>
+  {% else %}
+    <section class="page-heading">
+      <div class="page-heading-copy">
+        <p class="eyebrow">Overview</p>
+        <h1>Home</h1>
+        <p class="page-subtitle">
+          A single view of every outlet registered to <strong>{{ current_user.username }}</strong>.
+          Measurements appear only after verified telemetry arrives from the ESP32-S3.
+        </p>
+      </div>
+      <div class="heading-meta">
+        <a class="btn btn-primary add-outlet-btn" href="{{ url_for('devices.add') }}">
+          {{ icon('plus') }} Add Smart Outlet
+        </a>
+        <span class="heading-note">
+          {{ counts.reporting }} of {{ counts.total }} reporting · {{ counts.on }} relay{{ '' if counts.on == 1 else 's' }} confirmed ON
+        </span>
+      </div>
+    </section>
+
+    {% if not outlets %}
+      <section class="empty-outlets glass-panel">
+        <div class="empty-orbit">{{ icon('qr') }}</div>
+        <h2>No smart outlets registered yet.</h2>
+        <p>Enter the ESP32 Device ID to generate a registration QR code.</p>
+        <a class="btn btn-primary btn-lg" href="{{ url_for('devices.add') }}">
+          {{ icon('plus') }} Add Smart Outlet
+        </a>
+        <p class="empty-hint">
+          No readings are displayed until a registered outlet sends real telemetry.
+          You can also <a href="{{ url_for('devices.pair') }}">use a printed pairing code</a>.
+        </p>
+      </section>
+    {% else %}
+      {% if not counts.reporting %}
+        <div class="notice" role="status">
+          {{ icon('info') }}
+          <div>
+            <strong>No outlet is online yet.</strong>
+            <p>
+              Registration only adds the outlet to your account. Measurements stay at zero and are
+              marked “awaiting data” until the ESP32 sends a heartbeat and verified telemetry
+              through the local server.
+            </p>
+          </div>
+        </div>
+      {% else %}
+        <div class="notice notice-neutral" role="status">
+          {{ icon('wifi') }}
+          <div>
+            <strong>{{ counts.reporting }} of {{ counts.total }} outlets online.</strong>
+            <p>
+              Heartbeats confirm the device IP, relay state, and hardware-controller link.
+              Electrical measurements still remain at zero until verified PZEM telemetry arrives.
+            </p>
+          </div>
+        </div>
+      {% endif %}
+
+      {% include "partials/summary_cards.html" %}
+
+      <section class="section-head">
+        <div>
+          <h2>Smart Outlets</h2>
+          <p>Each outlet keeps its own relay state, measurements, energy limit, and schedules.</p>
+        </div>
+        <span class="section-meta"><span class="dot is-waiting"></span> {{ counts.reporting }} of {{ counts.total }} reporting</span>
+      </section>
+
+      <div class="outlet-grid">
+        {% for outlet in outlets %}
+          {% include "partials/outlet_card.html" %}
+        {% endfor %}
+      </div>
+
+      <p class="page-foot-note">
+        {{ icon('shield') }}
+        Relay toggles and energy cutoff stay disabled until a device is authenticated,
+        confirmed online, and reports a valid relay state.
+      </p>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if current_user.is_authenticated and outlets %}
+<script src="{{ url_for('static', filename='js/power-chart.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
+{% endif %}
+{% endblock %}

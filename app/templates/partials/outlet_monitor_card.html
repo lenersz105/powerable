@@ -1,0 +1,78 @@
+{% from "partials/icons.html" import icon %}
+{% set key = outlet.id %}
+{% set relay_tone = outlet.relay_state if outlet.relay_state in ['on', 'off'] else 'unknown' %}
+<article class="monitor-card glass-panel" data-outlet-card data-device-id="{{ outlet.device_uid }}"
+         data-channel="{{ outlet.channel or '' }}" aria-label="{{ outlet.display_name }} live outlet">
+  <header class="monitor-card-head">
+    <span class="channel-badge">CH {{ outlet.channel or '—' }}</span>
+    <div class="outlet-name-wrap">
+      <span class="outlet-name-static">{{ outlet.display_name }}</span>
+      <span class="outlet-subnote">{{ outlet.device_uid }}</span>
+    </div>
+  </header>
+
+  <div class="monitor-relay">
+    <span class="relay-state is-{{ relay_tone }}" data-relay-state>Relay: {{ outlet.relay_label }}</span>
+    <label class="switch" title="Relay control requires confirmed hardware communication">
+      <input type="checkbox" data-relay-toggle disabled
+             {% if outlet.relay_state == 'on' %}checked{% endif %}
+             aria-label="{{ outlet.display_name }} relay">
+      <span class="switch-track"><span class="switch-thumb"></span></span>
+    </label>
+  </div>
+
+  <dl class="monitor-connection" aria-label="{{ outlet.display_name }} connection details">
+    <div>
+      <dt>Local IP</dt>
+      <dd class="mono">{{ outlet.ip_label }}</dd>
+    </div>
+    <div>
+      <dt>Hardware</dt>
+      <dd><span class="dot is-{{ outlet.hardware_tone }}"></span> {{ outlet.hardware_label }}</dd>
+    </div>
+    <div>
+      <dt>Network</dt>
+      <dd>{{ outlet.network_mode_label }}</dd>
+    </div>
+    <div>
+      <dt>Connection</dt>
+      <dd>{{ outlet.connection_type_label }}</dd>
+    </div>
+    <div>
+      <dt>Last communication</dt>
+      <dd>{{ outlet.last_seen_label }}</dd>
+    </div>
+  </dl>
+
+  <dl class="monitor-measurements" aria-label="{{ outlet.display_name }} measurements">
+    <div>
+      <dt>Voltage</dt>
+      <dd><span data-field="voltage" data-state="missing" title="No verified reading received">0.00</span> <small>V</small></dd>
+    </div>
+    <div>
+      <dt>Current</dt>
+      <dd><span data-field="current" data-state="missing" title="No verified reading received">0.00</span> <small>A</small></dd>
+    </div>
+    <div>
+      <dt>Active Power</dt>
+      <dd><span data-field="power" data-state="missing" title="No verified reading received">0.00</span> <small>W</small></dd>
+    </div>
+    <div>
+      <dt>Power Factor</dt>
+      <dd><span data-field="power-factor" data-state="missing" title="No verified reading received">0.00</span></dd>
+    </div>
+    <div>
+      <dt>Total Energy</dt>
+      <dd><span data-field="total-energy" data-state="missing" title="No verified reading received">0.000</span> <small>kWh</small></dd>
+    </div>
+    <div>
+      <dt>Session Energy</dt>
+      <dd><span data-field="session-energy" data-state="missing" title="No verified reading received">0.000</span> <small>kWh</small></dd>
+    </div>
+  </dl>
+
+  <p class="monitor-foot">
+    <span class="dot is-{{ outlet.connection_tone }}"></span>
+    {{ outlet.connection_label }}
+  </p>
+</article>

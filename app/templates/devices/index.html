@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — My Outlets{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="page-heading">
+    <div class="page-heading-copy">
+      <p class="eyebrow">Devices</p>
+      <h1>My Outlets</h1>
+      <p class="page-subtitle">
+        Outlets registered to <strong>{{ current_user.username }}</strong>. Registration links the
+        device to your account; it does not mean the hardware is online.
+      </p>
+    </div>
+    <div class="heading-meta">
+      <a class="btn btn-primary add-outlet-btn" href="{{ url_for('devices.add') }}">
+        {{ icon('plus') }} Add Smart Outlet
+      </a>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('devices.pair') }}">
+        {{ icon('qr') }} Use pairing code
+      </a>
+      <span class="heading-note">{{ counts.total }} registered · {{ counts.reporting }} online</span>
+    </div>
+  </section>
+
+  {% if not outlets %}
+    <section class="empty-outlets glass-panel">
+      <div class="empty-orbit">{{ icon('qr') }}</div>
+      <h2>No smart outlets registered yet.</h2>
+      <p>Enter the ESP32 Device ID to generate a registration QR code.</p>
+      <a class="btn btn-primary btn-lg" href="{{ url_for('devices.add') }}">
+        {{ icon('plus') }} Add Smart Outlet
+      </a>
+      <p class="empty-hint">
+        Have a printed pairing label instead?
+        <a href="{{ url_for('devices.pair') }}">Use the pairing code flow</a>.
+      </p>
+    </section>
+  {% else %}
+    <div class="device-list">
+      {% for outlet in outlets %}
+        <article class="device-row glass-panel">
+          <div class="device-main">
+            <span class="channel-badge">CH {{ outlet.channel or '—' }}</span>
+            <div>
+              <h2>{{ outlet.display_name }}</h2>
+              <p class="device-id">{{ outlet.device_uid }} · {{ outlet.device_type }}</p>
+            </div>
+          </div>
+
+          <div class="device-statuses">
+            <span class="tag">{{ outlet.pairing_label }}</span>
+            <span class="status-pill {{ 'is-online' if outlet.connection_tone == 'online' else ('is-offline' if outlet.connection_tone == 'offline' else 'is-waiting') }}">
+              <span class="dot is-{{ outlet.connection_tone }}"></span>
+              {{ outlet.connection_label }}
+            </span>
+            <span class="relay-state is-{{ outlet.relay_state if outlet.relay_state in ['on', 'off'] else 'unknown' }}">
+              Relay: {{ outlet.relay_label }}
+            </span>
+            <span class="status-pill {{ 'is-online' if outlet.hardware_connected == true else ('is-offline' if outlet.hardware_connected == false else 'is-waiting') }}">
+              <span class="dot is-{{ outlet.hardware_tone }}"></span>
+              Hardware: {{ outlet.hardware_label }}
+            </span>
+          </div>
+
+          <dl class="device-meta">
+            <div><dt>Local IP</dt><dd class="mono">{{ outlet.ip_label }}</dd></div>
+            <div><dt>Network</dt><dd>{{ outlet.network_mode_label }} · {{ outlet.connection_type_label }}</dd></div>
+            <div><dt>Last communication</dt><dd>{{ outlet.last_seen_label }}</dd></div>
+            <div><dt>Registered</dt><dd>{{ outlet.registered_at.strftime('%d %b %Y') if outlet.registered_at else '—' }}</dd></div>
+          </dl>
+        </article>
+      {% endfor %}
+    </div>
+
+    <div class="notice notice-neutral" role="status">
+      {{ icon('info') }}
+      <div>
+        <strong>Registered does not mean connected.</strong>
+        <p>
+          These outlets will show “Waiting for first reading” until the ESP32-S3 sends verified
+          telemetry. Relay controls stay disabled until confirmed hardware communication exists.
+        </p>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

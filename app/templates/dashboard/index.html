@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — Live Dashboard{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="page-heading">
+    <div class="page-heading-copy">
+      <p class="eyebrow">Live Outlet Monitor</p>
+      <h1>Live Dashboard</h1>
+      <p class="page-subtitle">
+        Registration details and heartbeats as reported by the ESP32 network
+        controller. Measurements stay at zero until verified PZEM-004T readings
+        arrive; nothing on this page is estimated or simulated.
+      </p>
+    </div>
+    <div class="heading-meta">
+      <span class="status-pill {{ 'is-online' if counts.reporting else 'is-waiting' }}">
+        <span class="dot {{ 'is-online' if counts.reporting else 'is-waiting' }}"></span>
+        {{ 'Receiving data' if counts.reporting else 'Waiting for data' }}
+      </span>
+      <span class="heading-note">{{ counts.reporting }} of {{ counts.total }} outlets reporting</span>
+    </div>
+  </section>
+
+  {% if not outlets %}
+    <section class="empty-outlets glass-panel">
+      <div class="empty-orbit">{{ icon('activity') }}</div>
+      <h2>No registered outlets to monitor.</h2>
+      <p>Register a PowerAble outlet first, then its live card will appear here.</p>
+      <a class="btn btn-primary btn-lg" href="{{ url_for('devices.add') }}">
+        {{ icon('plus') }} Add Smart Outlet
+      </a>
+      <p class="empty-hint">
+        Already have a printed label? <a href="{{ url_for('devices.pair') }}">Use the pairing code flow</a>.
+      </p>
+    </section>
+  {% else %}
+    <section class="monitor-bar glass-panel" aria-label="Connection details">
+      <div class="monitor-meta">
+        <div>
+          <span class="meta-label">Local address</span>
+          <strong>{{ public_base_url or request.host_url }}</strong>
+        </div>
+        <div>
+          <span class="meta-label">Communication</span>
+          <strong><span class="dot {{ 'is-online' if counts.reporting else 'is-waiting' }}"></span>
+            {{ 'Receiving data' if counts.reporting else 'Waiting for data' }}</strong>
+        </div>
+        <div>
+          <span class="meta-label">Uptime</span>
+          <strong>Not tracked yet</strong>
+        </div>
+        <div>
+          <span class="meta-label">Local clock</span>
+          <strong data-local-clock>--:--:--</strong>
+        </div>
+      </div>
+
+      <div class="monitor-actions">
+        <button type="button" class="btn btn-success" disabled title="Requires a confirmed online device">All ON</button>
+        <button type="button" class="btn btn-danger" disabled title="Requires a confirmed online device">All OFF</button>
+        <button type="button" class="btn btn-ghost" disabled title="Voice control is a future feature">
+          {{ icon('volume') }} Voice Command <span class="tag">Planned</span>
+        </button>
+      </div>
+    </section>
+
+    <p class="monitor-note">
+      {{ icon('info') }}
+      Controls are intentionally disabled. This stage has no telemetry or command transport yet, so
+      clicking a toggle could not reach a relay. Confirmed hardware state is required before the UI changes.
+    </p>
+
+    <div class="monitor-grid">
+      {% for outlet in outlets %}
+        {% include "partials/outlet_monitor_card.html" %}
+      {% endfor %}
+    </div>
+
+    <div class="notice notice-neutral" role="status">
+      {{ icon('activity') }}
+      <div>
+        <strong>Heartbeats update connection state, not measurements.</strong>
+        <p>
+          The ESP32 reports its IP, relay state, and hardware-controller link to
+          <code>/api/device/heartbeat</code>. Refresh this page to see the latest values.
+          Electrical readings stay at zero with an “awaiting data” state until verified
+          PZEM telemetry is added.
+        </p>
+      </div>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if outlets %}
+<script src="{{ url_for('static', filename='js/dashboard.js') }}" defer></script>
+{% endif %}
+{% endblock %}

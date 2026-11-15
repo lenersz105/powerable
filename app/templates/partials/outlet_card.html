@@ -1,0 +1,168 @@
+{% from "partials/icons.html" import icon %}
+{% set key = outlet.id %}
+{% set relay_tone = outlet.relay_state if outlet.relay_state in ['on', 'off'] else 'unknown' %}
+<article class="outlet-card glass-panel" data-outlet-card data-device-id="{{ outlet.device_uid }}"
+         data-channel="{{ outlet.channel or '' }}" aria-label="{{ outlet.display_name }} smart outlet">
+  <header class="outlet-card-head">
+    <div class="outlet-identity">
+      <span class="channel-badge">CH {{ outlet.channel or '—' }}</span>
+      <div class="outlet-name-wrap">
+        <span class="outlet-name-static">{{ outlet.display_name }}</span>
+        <span class="outlet-subnote">{{ outlet.device_type }} · {{ outlet.device_uid }}</span>
+      </div>
+    </div>
+
+    <div class="relay-control">
+      <span class="relay-state is-{{ relay_tone }}" data-relay-state>Relay: {{ outlet.relay_label }}</span>
+      <label class="switch" title="Relay control requires confirmed hardware communication">
+        <input type="checkbox" data-relay-toggle disabled
+               {% if outlet.relay_state == 'on' %}checked{% endif %}
+               aria-label="{{ outlet.display_name }} relay">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+      </label>
+      <span class="outlet-subnote">Not controllable yet</span>
+    </div>
+  </header>
+
+  <div class="outlet-status-strip">
+    <span class="status-pill is-{{ 'online' if outlet.connection_tone == 'online' else ('offline' if outlet.connection_tone == 'offline' else 'waiting') }}">
+      <span class="dot is-{{ outlet.connection_tone }}"></span>
+      {{ outlet.connection_label }}
+    </span>
+    <span class="tag">{{ outlet.pairing_label }}</span>
+    <span class="status-pill {{ 'is-online' if outlet.hardware_connected == true else ('is-offline' if outlet.hardware_connected == false else 'is-waiting') }}">
+      <span class="dot is-{{ outlet.hardware_tone }}"></span>
+      Hardware: {{ outlet.hardware_label }}
+    </span>
+  </div>
+
+  <section class="card-section" aria-labelledby="measurements-title-{{ key }}">
+    <div class="section-label">
+      <span id="measurements-title-{{ key }}">{{ icon('gauge') }} Measurements</span>
+      <span class="tag tag-muted">PZEM-004T</span>
+    </div>
+    <p class="card-data-flag">
+      <span class="dot is-waiting"></span>
+      Waiting for first reading — the zeros below are placeholders, not measurements.
+    </p>
+    <dl class="measurement-grid">
+      <div class="measurement">
+        <dt>Voltage</dt>
+        <dd><span data-field="voltage" data-state="missing" title="No verified reading received">0.00</span> <small>V</small></dd>
+      </div>
+      <div class="measurement">
+        <dt>Current</dt>
+        <dd><span data-field="current" data-state="missing" title="No verified reading received">0.00</span> <small>A</small></dd>
+      </div>
+      <div class="measurement">
+        <dt>Active Power</dt>
+        <dd><span data-field="power" data-state="missing" title="No verified reading received">0.00</span> <small>W</small></dd>
+      </div>
+      <div class="measurement">
+        <dt>Power Factor</dt>
+        <dd><span data-field="power-factor" data-state="missing" title="No verified reading received">0.00</span></dd>
+      </div>
+      <div class="measurement">
+        <dt>Total Energy</dt>
+        <dd><span data-field="total-energy" data-state="missing" title="No verified reading received">0.000</span> <small>kWh</small></dd>
+      </div>
+      <div class="measurement">
+        <dt>Session Energy</dt>
+        <dd><span data-field="session-energy" data-state="missing" title="No verified reading received">0.000</span> <small>kWh</small></dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="card-section" aria-labelledby="ai-title-{{ key }}">
+    <div class="section-label">
+      <span id="ai-title-{{ key }}">{{ icon('sparkles') }} AI appliance classification</span>
+      <span class="tag tag-muted">TinyML · planned</span>
+    </div>
+    <div class="ai-body">
+      <div class="ai-appliance">
+        <span class="ai-name" data-field="ai-label">No classification</span>
+        <span class="outlet-subnote">Detected appliance</span>
+      </div>
+      <div class="ai-confidence">
+        <span data-field="ai-confidence">0%</span>
+        <span class="outlet-subnote">Confidence</span>
+      </div>
+    </div>
+    <p class="panel-note">Status: awaiting model result · Last update: —</p>
+  </section>
+
+  <section class="card-section" aria-labelledby="trend-title-{{ key }}">
+    <div class="section-label">
+      <span id="trend-title-{{ key }}">{{ icon('activity') }} Power trend</span>
+      <span class="tag tag-muted">Last 20 samples</span>
+    </div>
+    <div class="chart-wrap">
+      <canvas class="power-chart" data-power-chart="{{ outlet.device_uid }}"
+              role="img" aria-label="Power trend for {{ outlet.display_name }}. No samples received yet."></canvas>
+      <p class="chart-empty" data-chart-empty>No samples yet — waiting for verified readings.</p>
+    </div>
+  </section>
+
+  <section class="card-section" aria-labelledby="limit-title-{{ key }}">
+    <div class="section-label">
+      <span id="limit-title-{{ key }}">{{ icon('shield') }} Energy limit</span>
+      <span class="tag tag-muted">Stage 5</span>
+    </div>
+    <fieldset class="limit-panel" disabled>
+      <legend class="sr-only">Energy limit settings for {{ outlet.display_name }}</legend>
+      <div class="form-row">
+        <label class="field" for="limit-{{ key }}">
+          Maximum session energy
+          <span class="input-with-unit">
+            <input id="limit-{{ key }}" type="number" min="0" step="0.001" placeholder="0.000">
+            <span>kWh</span>
+          </span>
+        </label>
+        <label class="check-row">
+          <input type="checkbox" data-auto-cutoff>
+          Auto cutoff
+        </label>
+      </div>
+      <p class="panel-note">Cutoff will run only on verified energy readings. Available in Stage 5.</p>
+    </fieldset>
+  </section>
+
+  <details class="schedule-panel card-section">
+    <summary>
+      {{ icon('clock') }} Scheduling
+      <span class="tag tag-muted">0 saved</span>
+      {{ icon('chevron', 'icon chevron') }}
+    </summary>
+    <div class="schedule-body">
+      <p class="panel-note">No schedules configured for this outlet.</p>
+      <fieldset class="schedule-form" disabled>
+        <legend class="sr-only">Add a schedule for {{ outlet.display_name }}</legend>
+        <label class="field">
+          Action
+          <select>
+            <option>ON</option>
+            <option>OFF</option>
+          </select>
+        </label>
+        <label class="field">
+          Time
+          <input type="time">
+        </label>
+        <label class="check-row">
+          <input type="checkbox" checked>
+          Enabled
+        </label>
+        <button type="button" class="btn btn-primary btn-sm">Save schedule</button>
+      </fieldset>
+      <p class="panel-note">Saving activates in Stage 5 (SQLite schedules + local execution).</p>
+    </div>
+  </details>
+
+  <footer class="outlet-card-foot">
+    <span>Local IP: {{ outlet.ip_label }}</span>
+    <span>Last communication: {{ outlet.last_seen_label }}</span>
+    <span>Registered:
+      {{ outlet.registered_at.strftime('%d %b %Y') if outlet.registered_at else '—' }}
+    </span>
+  </footer>
+</article>

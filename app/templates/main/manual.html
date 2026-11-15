@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — User Manual{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="page-heading">
+    <div class="page-heading-copy">
+      <p class="eyebrow">Documentation</p>
+      <h1>User Manual</h1>
+      <p class="page-subtitle">
+        A plain-language guide to reading the dashboard, controlling outlets safely,
+        and understanding what PowerAble can and cannot do today.
+      </p>
+    </div>
+    <div class="heading-meta">
+      <span class="status-pill is-waiting"><span class="dot"></span> Stage 2 · Accounts &amp; pairing</span>
+      <span class="heading-note">Hardware integration pending</span>
+    </div>
+  </section>
+
+  <div class="notice" role="status">
+    {{ icon('shield') }}
+    <div>
+      <strong>Important: the measurements on this site are not live yet.</strong>
+      <p>
+        No ESP32-S3 is connected at this stage. Every reading is displayed as zero and
+        marked as awaiting data. Do not use PowerAble for electrical decisions until
+        real, verified telemetry is shown.
+      </p>
+    </div>
+  </div>
+
+  <div class="manual-layout">
+    <aside class="manual-nav" aria-label="Manual contents">
+      <p class="manual-nav-title">On this page</p>
+      <a href="#start">Getting started</a>
+      <a href="#camera">Accounts, pairing &amp; camera</a>
+      <a href="#readings">Understanding readings</a>
+      <a href="#controls">Relay controls</a>
+      <a href="#limits">Energy limits</a>
+      <a href="#schedules">Schedules</a>
+      <a href="#connection">Connection states</a>
+      <a href="#troubleshooting">Troubleshooting</a>
+      <a href="#safety">Safety notes</a>
+    </aside>
+
+    <div class="manual-content">
+      <section class="content-card" id="start">
+        <div class="card-heading">
+          <div>
+            <h2>Getting started</h2>
+            <p>What you are looking at right now.</p>
+          </div>
+        </div>
+        <ol class="steps">
+          <li>
+            <strong>Start the local server.</strong>
+            Run <code>python run.py</code> and open
+            <code>http://127.0.0.1:5000/</code> on the same computer. PowerAble does not
+            need the internet.
+          </li>
+          <li>
+            <strong>Create an account or sign in.</strong>
+            Pairing an outlet requires a signed-in account so the outlet can be linked to
+            you. Passwords are stored only as hashes.
+          </li>
+          <li>
+            <strong>Check the connection banner.</strong>
+            “Waiting for hardware” means the Flask server is running but no verified
+            outlet telemetry has arrived.
+          </li>
+          <li>
+            <strong>Register an outlet.</strong>
+            Open <code>/devices/pair</code> or tap the Add button in the mobile dock, then
+            scan the label or type the printed credentials.
+          </li>
+          <li>
+            <strong>Read the summary cards and outlet cards.</strong>
+            Each registered outlet keeps its own measurements, relay state, energy limit,
+            and future schedules.
+          </li>
+        </ol>
+      </section>
+
+      <section class="content-card" id="camera">
+        <div class="card-heading">
+          <div>
+            <h2>Accounts, pairing &amp; camera</h2>
+            <p>How to register a real outlet, especially from a phone.</p>
+          </div>
+          <span class="tag tag-muted">Stage 2</span>
+        </div>
+
+        <ol class="steps">
+          <li>
+            <strong>Install the label.</strong>
+            The installer runs
+            <code>flask --app run.py provision-outlet --device-id PA-ESP32-0001</code>.
+            The command prints the pairing code once and writes a QR image under
+            <code>instance/qr/</code>. Only a one-way hash of the code is stored.
+          </li>
+          <li>
+            <strong>Open a secure address on the phone.</strong>
+            Mobile browsers only allow the camera on <code>https://</code> pages or
+            <code>localhost</code>. On a computer, run
+            <code>python scripts/serve_https.py</code> and open the printed
+            <code>https://&lt;your-computer-ip&gt;:5443/</code> address on the phone.
+            The helper creates a self-signed local certificate, so the phone shows a
+            one-time warning you must accept. A plain
+            <code>http://192.168.x.x:5000</code> address cannot use the camera.
+          </li>
+          <li>
+            <strong>Allow camera permission.</strong>
+            Tap <em>Start camera</em> and accept the browser prompt. The rear camera is
+            requested first. Flashlight and camera switching appear only when the device
+            and browser report support.
+          </li>
+          <li>
+            <strong>Scan or type the label.</strong>
+            If the camera is unavailable, open
+            <em>Enter device details manually</em> and type the device ID and pairing
+            code. The same server checks apply.
+          </li>
+          <li>
+            <strong>Confirm the device.</strong>
+            The confirmation sheet shows the device ID and type. Nothing is registered
+            until you tap <em>Register This Outlet</em>.
+          </li>
+          <li>
+            <strong>Register once.</strong>
+            Registration links the outlet to your account and consumes the code. The same
+            QR label cannot be used again. Registering does not put the outlet online.
+          </li>
+        </ol>
+
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Security rule</th>
+                <th scope="col">Behaviour</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>QR contents</td><td>Format version, public device ID, one-time pairing code. No Wi-Fi password or permanent secret.</td></tr>
+              <tr><td>Code storage</td><td>Only a scrypt hash is kept; the plaintext code is shown once during provisioning.</td></tr>
+              <tr><td>Single use</td><td>A successful registration clears the code immediately.</td></tr>
+              <tr><td>Rejected states</td><td>Invalid, revoked, already-claimed, and malformed labels are refused by the server.</td></tr>
+              <tr><td>Ownership</td><td>Only the signed-in owner can read the outlet. Other accounts receive “not found”.</td></tr>
+              <tr><td>Camera feed</td><td>Frames are decoded locally in the browser. Only the QR text is sent to your Flask server.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <ul class="info-list">
+          <li><strong>Stop the camera</strong> with the Stop button, or by leaving the page. The browser releases the camera.</li>
+          <li><strong>Flashlight</strong> is used only when the active camera exposes a torch capability.</li>
+          <li><strong>Manual entry</strong> works over plain HTTP and needs no camera permission.</li>
+        </ul>
+
+        <p class="panel-note">
+          Wi-Fi provisioning for the ESP32-S3 is a separate process that is not implemented
+          yet. Pairing a label never sends Wi-Fi credentials, and a registered outlet stays
+          “waiting for first reading” until real telemetry arrives.
+        </p>
+      </section>
+
+      <section class="content-card" id="readings">
+        <div class="card-heading">
+          <div>
+            <h2>Understanding readings</h2>
+            <p>Zero can mean two very different things.</p>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th scope="col">Field</th>
+                <th scope="col">Meaning</th>
+                <th scope="col">Initial state</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Voltage</td><td>Supply voltage in volts.</td><td>0.00 V · awaiting data</td></tr>
+              <tr><td>Current</td><td>Current drawn by the appliance in amperes.</td><td>0.00 A · awaiting data</td></tr>
+              <tr><td>Active Power</td><td>Real power in watts.</td><td>0.00 W · awaiting data</td></tr>
+              <tr><td>Power Factor</td><td>Ratio of real power to apparent power.</td><td>0.00 · awaiting data</td></tr>
+              <tr><td>Total Energy</td><td>Lifetime energy counted by the outlet.</td><td>0.000 kWh · awaiting data</td></tr>
+              <tr><td>Session Energy</td><td>Energy counted since the current session began.</td><td>0.000 kWh · awaiting data</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="panel-note">
+          A reading of <strong>0.00 W with a valid timestamp</strong> means the outlet
+          is genuinely drawing no power. A reading of <strong>0.00 W marked “awaiting
+          data”</strong> means no verified measurement exists. The interface always
+          distinguishes the two.
+        </p>
+      </section>
+
+      <section class="content-card" id="controls">
+        <div class="card-heading">
+          <div>
+            <h2>Relay controls</h2>
+            <p>Commands must be confirmed by the hardware.</p>
+          </div>
+        </div>
+        <p>
+          Clicking a toggle will eventually send a command to the ESP32-S3 through the
+          Flask API. The switch will not change to ON just because it was clicked. It
+          changes only after the outlet reports its confirmed relay state.
+        </p>
+        <ul class="info-list">
+          <li><strong>Unknown</strong> — no confirmed relay state has been received.</li>
+          <li><strong>OFF</strong> — the hardware confirmed the relay is open.</li>
+          <li><strong>ON</strong> — the hardware confirmed the relay is closed.</li>
+        </ul>
+        <p class="panel-note">
+          At this stage the switches stay disabled because no outlet has reported a relay
+          state yet.
+        </p>
+      </section>
+
+      <section class="content-card" id="limits">
+        <div class="card-heading">
+          <div>
+            <h2>Energy limits and auto cutoff</h2>
+            <p>Safety features need trustworthy measurements.</p>
+          </div>
+        </div>
+        <p>
+          Each outlet can have a maximum session energy. When the verified session
+          energy reaches that limit, PowerAble will request an OFF command and record
+          the event. If energy readings are stale, missing, or invalid, the cutoff will
+          not silently guess — it will report that it could not act.
+        </p>
+        <p class="panel-note">
+          The input and Auto Cutoff switch are placeholders until Stage 5.
+        </p>
+      </section>
+
+      <section class="content-card" id="schedules">
+        <div class="card-heading">
+          <div>
+            <h2>Schedules</h2>
+            <p>Local time-based ON/OFF operations.</p>
+          </div>
+        </div>
+        <p>
+          The Scheduling page will let you choose an outlet, an ON or OFF action, and a
+          local time. Schedules will be stored in SQLite. For offline reliability,
+          critical schedules are planned to be mirrored to the ESP32-S3 so they can run
+          even if the Flask server is temporarily unavailable.
+        </p>
+        <p class="panel-note">
+          Scheduling is still a design preview. Saving is implemented in Stage 5.
+        </p>
+      </section>
+
+      <section class="content-card" id="connection">
+        <div class="card-heading">
+          <div>
+            <h2>Connection states</h2>
+            <p>How to tell what the system really knows.</p>
+          </div>
+        </div>
+        <ul class="status-list">
+          <li>
+            <span class="status-dot is-waiting"></span>
+            <div><strong>Waiting for data</strong><span>The server is running, but no verified telemetry has arrived.</span></div>
+          </li>
+          <li>
+            <span class="status-dot is-online"></span>
+            <div><strong>Online</strong><span>A recent, authenticated message was received from the device.</span></div>
+          </li>
+          <li>
+            <span class="status-dot is-stale"></span>
+            <div><strong>Stale</strong><span>The last reading is too old to be trusted. Values are marked as outdated.</span></div>
+          </li>
+          <li>
+            <span class="status-dot is-offline"></span>
+            <div><strong>Disconnected</strong><span>No recent communication. Commands are rejected or queued only if explicitly supported.</span></div>
+          </li>
+        </ul>
+      </section>
+
+      <section class="content-card" id="troubleshooting">
+        <div class="card-heading">
+          <div>
+            <h2>Troubleshooting</h2>
+            <p>Common local-development checks.</p>
+          </div>
+        </div>
+        <div class="faq-list">
+          <details>
+            <summary>All values are still zero. Is that a bug?</summary>
+            <p>
+              Not necessarily. Until the ESP32-S3 sends verified telemetry, zero is the
+              correct placeholder and each card says “awaiting data.” Check the
+              connection indicator before assuming a measurement.
+            </p>
+          </details>
+          <details>
+            <summary>The page will not open.</summary>
+            <p>
+              Confirm the Flask server is running with <code>python run.py</code> and
+              open <code>http://127.0.0.1:5000/</code>. Check the PyCharm terminal for
+              errors.
+            </p>
+          </details>
+          <details>
+            <summary>Why are the relay switches disabled?</summary>
+            <p>
+              Hardware control is not implemented yet. Enabling a switch without a
+              confirmed hardware response would be misleading.
+            </p>
+          </details>
+          <details>
+            <summary>The camera will not start on my phone.</summary>
+            <p>
+              Mobile browsers require HTTPS or localhost for camera access. If the page
+              address starts with plain <code>http://</code> and is not localhost, use
+              <code>python scripts/serve_https.py</code>, accept the self-signed
+              certificate warning, and reload. You can always fall back to manual entry.
+            </p>
+          </details>
+          <details>
+            <summary>My pairing label is rejected.</summary>
+            <p>
+              Codes are single-use. A label is also rejected when it is malformed, belongs
+              to a revoked outlet, or was already registered. Ask the installer to provision
+              a new label for that device.
+            </p>
+          </details>
+          <details>
+            <summary>Does PowerAble need the internet?</summary>
+            <p>
+              No. Flask, SQLite, CSS, JavaScript, and the planned ESP32-S3 communication
+              all run on the local network. No CDN or cloud service is used.
+            </p>
+          </details>
+        </div>
+      </section>
+
+      <section class="content-card" id="safety">
+        <div class="card-heading">
+          <div>
+            <h2>Safety notes</h2>
+            <p>This is a thesis prototype, not a certified electrical product.</p>
+          </div>
+        </div>
+        <ul class="info-list">
+          <li>Do not touch mains wiring while the circuit is energized.</li>
+          <li>Use a properly rated relay module and enclosure for any real load.</li>
+          <li>Never rely on the web interface as the only safety disconnect.</li>
+          <li>Test with a safe, low-power load before connecting appliances.</li>
+          <li>Follow your local electrical code and institutional safety rules.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

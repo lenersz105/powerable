@@ -1,0 +1,72 @@
+{% extends "admin/base_admin.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block admin_title %}Generate a pairing label{% endblock %}
+{% block admin_subtitle %}
+  Create a new single-use QR label, or rotate the label for an existing outlet.
+{% endblock %}
+
+{% block admin_actions %}
+  <a class="btn btn-ghost" href="{{ url_for('admin.outlets') }}">
+    {{ icon('arrow-left') }} Back to outlets
+  </a>
+{% endblock %}
+
+{% block admin_content %}
+<div class="admin-two-col">
+  <section class="content-card">
+    <div class="card-heading">
+      <h2>Label details</h2>
+      <p>The device ID is printed on the physical outlet. Reusing an ID rotates its existing label.</p>
+    </div>
+
+    <form class="form-grid" method="post" action="{{ url_for('admin.new_outlet') }}" novalidate>
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+      <label class="field">
+        Device ID
+        <input type="text" name="device_id" value="{{ values.device_id }}" required
+               maxlength="64" autocapitalize="characters" spellcheck="false"
+               placeholder="PA-ESP32-0001" autofocus>
+        <span class="field-hint">3–64 characters: A–Z, 0–9, and dashes.</span>
+      </label>
+
+      <label class="field">
+        Device type
+        <input type="text" name="device_type" value="{{ values.device_type }}"
+               maxlength="64" placeholder="Smart Power Outlet">
+        <span class="field-hint">Shown in the admin and customer outlet lists.</span>
+      </label>
+
+      <div class="form-actions">
+        <button class="btn btn-primary" type="submit">
+          {{ icon('qr') }} Generate label
+        </button>
+        <a class="btn btn-ghost" href="{{ url_for('admin.outlets') }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+
+  <aside class="content-card">
+    <div class="card-heading">
+      <h2>What happens next</h2>
+    </div>
+    <ol class="steps">
+      <li><strong>A random pairing code is created.</strong> It contains no Wi-Fi password and no permanent device secret.</li>
+      <li><strong>Only a scrypt hash is stored.</strong> The plaintext code appears exactly once, on the label response.</li>
+      <li><strong>Print or scan the label.</strong> The device is not online merely because a label exists.</li>
+      <li><strong>The code is single-use.</strong> Registering the outlet clears the hash, so the label stops working.</li>
+    </ol>
+    <div class="notice notice-neutral" role="note">
+      {{ icon('shield') }}
+      <div>
+        <strong>Admin actions are audited.</strong>
+        <p>Provisioning writes an entry to the admin activity log. No pairing code is written to that log.</p>
+      </div>
+    </div>
+    <p class="panel-note">
+      Already registered? Revoke the outlet first, then issue a new label.
+    </p>
+  </aside>
+</div>
+{% endblock %}

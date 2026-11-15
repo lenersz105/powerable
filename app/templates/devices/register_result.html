@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — Outlet Registration{% endblock %}
+
+{% block content %}
+<div class="page page-narrow">
+  <a class="back-link" href="{{ url_for('devices.index') }}">
+    {{ icon('arrow-left') }} My outlets
+  </a>
+
+  <section class="register-result glass-panel
+                  {{ 'is-success' if ok and created else ('is-info' if ok else 'is-error') }}">
+    <span class="result-mark">
+      {{ icon('check') if ok and created else (icon('info') if ok else icon('alert')) }}
+    </span>
+
+    {% if ok and created %}
+      <p class="eyebrow">Registration complete</p>
+      <h1>Smart outlet registered</h1>
+    {% elif ok %}
+      <p class="eyebrow">Already registered</p>
+      <h1>This outlet is already yours</h1>
+    {% else %}
+      <p class="eyebrow">Registration stopped</p>
+      <h1>Outlet was not registered</h1>
+    {% endif %}
+
+    <p class="page-subtitle">{{ message }}</p>
+
+    {% if ok and outlet %}
+      <dl class="result-details">
+        <div><dt>Outlet name</dt><dd>{{ outlet.display_name }}</dd></div>
+        <div><dt>Device ID</dt><dd class="mono">{{ outlet.device_uid }}</dd></div>
+        <div><dt>Local IP</dt><dd>{{ outlet.ip_label }}</dd></div>
+        <div>
+          <dt>Online status</dt>
+          <dd>
+            <span class="status-pill is-{{ outlet.connection_tone }}">
+              <span class="dot is-{{ outlet.connection_tone }}"></span>
+              {{ outlet.connection_label }}
+            </span>
+          </dd>
+        </div>
+        <div><dt>Relay</dt><dd>{{ outlet.relay_label }}</dd></div>
+        <div>
+          <dt>Hardware controller</dt>
+          <dd><span class="dot is-{{ outlet.hardware_tone }}"></span> {{ outlet.hardware_label }}</dd>
+        </div>
+        <div><dt>Last communication</dt><dd>{{ outlet.last_seen_label }}</dd></div>
+        <div><dt>Registered</dt><dd>{{ outlet.registered_at.strftime('%d %b %Y, %H:%M UTC') if outlet.registered_at else '—' }}</dd></div>
+      </dl>
+
+      <div class="result-actions">
+        <a class="btn btn-primary btn-lg" href="{{ url_for('dashboard.index') }}">
+          {{ icon('activity') }} Go to Dashboard
+        </a>
+        <a class="btn btn-glass" href="{{ url_for('devices.add') }}">
+          {{ icon('plus') }} Add another outlet
+        </a>
+        <a class="btn btn-ghost" href="{{ url_for('devices.index') }}">My outlets</a>
+      </div>
+
+      <p class="panel-note">
+        {{ icon('wifi') }}
+        IP, relay state, and hardware status stay unknown until the ESP32 sends
+        its first heartbeat to <code>/api/device/heartbeat</code>. Refresh the
+        dashboard after it connects.
+      </p>
+    {% else %}
+      {% if device_id %}
+        <p class="result-device-id">Device ID: <code>{{ device_id }}</code></p>
+      {% endif %}
+      <div class="result-actions">
+        <a class="btn btn-primary" href="{{ url_for('devices.add', device_id=device_id or '') }}">
+          {{ icon('refresh') }} Try again
+        </a>
+        <a class="btn btn-glass" href="{{ url_for('devices.index') }}">My outlets</a>
+        <a class="btn btn-ghost" href="{{ url_for('devices.pair') }}">
+          {{ icon('qr') }} Use a pairing code
+        </a>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

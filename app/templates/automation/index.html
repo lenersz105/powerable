@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% from "partials/icons.html" import icon %}
+
+{% block title %}PowerAble — Scheduling{% endblock %}
+
+{% block content %}
+<div class="page">
+  <section class="page-heading">
+    <div class="page-heading-copy">
+      <p class="eyebrow">Automation</p>
+      <h1>Scheduling</h1>
+      <p class="page-subtitle">
+        Plan ON and OFF operations for each outlet. Schedules will be stored in SQLite
+        and executed locally — no internet connection required.
+      </p>
+    </div>
+    <div class="heading-meta">
+      <span class="status-pill is-waiting"><span class="dot"></span> Design preview</span>
+      <span class="heading-note">
+        {{ outlets|length }} registered outlet{{ '' if outlets|length == 1 else 's' }}
+      </span>
+    </div>
+  </section>
+
+  <div class="notice" role="status">
+    {{ icon('info') }}
+    <div>
+      <strong>Scheduling is not saving yet.</strong>
+      <p>
+        The form below shows the planned workflow using your real registered outlets.
+        It will be connected to the <code>AutomationSchedule</code> database table in
+        Stage 5. No schedule is active, so no automatic switching can occur.
+      </p>
+    </div>
+  </div>
+
+  {% if outlets %}
+    <div class="schedule-layout">
+      <section class="content-card" aria-labelledby="builder-title">
+        <div class="card-heading">
+          <div>
+            <h2 id="builder-title">Schedule builder</h2>
+            <p>Pick one outlet, one action, and one local time.</p>
+          </div>
+          <span class="tag tag-muted">Stage 5</span>
+        </div>
+
+        <fieldset class="form-grid" disabled>
+          <legend class="sr-only">Create a schedule</legend>
+
+          <label class="field">
+            Outlet
+            <select>
+              {% for outlet in outlets %}
+                <option>
+                  CH {{ outlet.channel or '—' }} — {{ outlet.display_name }} ({{ outlet.device_uid }})
+                </option>
+              {% endfor %}
+            </select>
+          </label>
+
+          <label class="field">
+            Action
+            <select>
+              <option>Turn ON</option>
+              <option>Turn OFF</option>
+            </select>
+          </label>
+
+          <label class="field">
+            Time
+            <input type="time">
+          </label>
+
+          <label class="check-row field-inline">
+            <input type="checkbox" checked>
+            Enabled
+          </label>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-primary">Save schedule</button>
+            <button type="button" class="btn btn-ghost">Clear</button>
+          </div>
+        </fieldset>
+
+        <p class="panel-note">
+          For offline reliability, critical schedules will eventually be mirrored to the
+          ESP32-S3 so they can still run when the Flask server is unavailable.
+        </p>
+      </section>
+
+      <section class="content-card" aria-labelledby="execution-title">
+        <div class="card-heading">
+          <div>
+            <h2 id="execution-title">Execution status</h2>
+            <p>How schedules will behave on the local network.</p>
+          </div>
+        </div>
+        <ul class="status-list">
+          <li>
+            <span class="status-dot is-waiting"></span>
+            <div><strong>Server scheduler</strong><span>Not running — implemented in Stage 5</span></div>
+          </li>
+          <li>
+            <span class="status-dot is-waiting"></span>
+            <div><strong>ESP32 local fallback</strong><span>Planned after hardware integration</span></div>
+          </li>
+          <li>
+            <span class="status-dot is-offline"></span>
+            <div><strong>Relay confirmation</strong><span>No relay state has been reported</span></div>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="content-card" aria-labelledby="outlets-title">
+      <div class="card-heading">
+        <div>
+          <h2 id="outlets-title">Outlets available to schedule</h2>
+          <p>These are the outlets registered to your account.</p>
+        </div>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('devices.pair') }}">
+          {{ icon('plus') }} Add outlet
+        </a>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Outlet</th>
+              <th scope="col">Device ID</th>
+              <th scope="col">Relay</th>
+              <th scope="col">Connection</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for outlet in outlets %}
+              <tr>
+                <td>
+                  <span class="channel-badge">CH {{ outlet.channel or '—' }}</span>
+                  {{ outlet.display_name }}
+                </td>
+                <td>{{ outlet.device_uid }}</td>
+                <td>{{ outlet.relay_label }}</td>
+                <td>{{ outlet.connection_label }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {% else %}
+    <section class="empty-outlets glass-panel">
+      <div class="empty-orbit">{{ icon('calendar') }}</div>
+      <h2>No outlets to schedule yet.</h2>
+      <p>
+        Register a PowerAble outlet first. Once it appears on your account, it will be
+        listed here for future schedules.
+      </p>
+      <a class="btn btn-primary btn-lg" href="{{ url_for('devices.pair') }}">
+        {{ icon('plus') }} Add Smart Outlet
+      </a>
+      <p class="empty-hint">
+        Scheduling stays disabled until the schedule table is implemented in Stage 5.
+      </p>
+    </section>
+  {% endif %}
+
+  <section class="content-card" aria-labelledby="saved-title">
+    <div class="card-heading">
+      <div>
+        <h2 id="saved-title">Saved schedules</h2>
+        <p>All schedules will run on the local network and be recorded in SQLite.</p>
+      </div>
+      <span class="tag tag-muted">0 schedules</span>
+    </div>
+
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th scope="col">Outlet</th>
+            <th scope="col">Time</th>
+            <th scope="col">Action</th>
+            <th scope="col">Enabled</th>
+            <th scope="col">Source</th>
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="6">
+              <div class="empty-state">
+                {{ icon('clock') }}
+                <strong>No schedules yet</strong>
+                <span>Schedules will appear here after Stage 5 is implemented.</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

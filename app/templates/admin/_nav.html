@@ -1,0 +1,19 @@
+{% from "partials/icons.html" import icon %}
+<nav class="admin-subnav glass-bar" aria-label="Admin sections">
+  <a class="admin-subnav-link {% if request.endpoint == 'admin.index' %}is-active{% endif %}"
+     href="{{ url_for('admin.index') }}">
+    {{ icon('gauge') }}<span>Overview</span>
+  </a>
+  <a class="admin-subnav-link {% if request.endpoint in ['admin.outlets', 'admin.new_outlet', 'admin.rotate_outlet', 'admin.rename_outlet', 'admin.revoke_outlet', 'admin.delete_outlet'] %}is-active{% endif %}"
+     href="{{ url_for('admin.outlets') }}">
+    {{ icon('plug') }}<span>Outlets &amp; labels</span>
+  </a>
+  <a class="admin-subnav-link {% if request.endpoint in ['admin.users', 'admin.set_role', 'admin.set_status', 'admin.reset_password', 'admin.delete_user'] %}is-active{% endif %}"
+     href="{{ url_for('admin.users') }}">
+    {{ icon('user') }}<span>Accounts</span>
+  </a>
+  <a class="admin-subnav-link {% if request.endpoint == 'admin.activity' %}is-active{% endif %}"
+     href="{{ url_for('admin.activity') }}">
+    {{ icon('activity') }}<span>Activity</span>
+  </a>
+</nav>

@@ -1,0 +1,710 @@
+/* PowerAble — QR scanner and pairing flow
+   Camera stage, scan frame, manual entry, confirmation sheet, and success sheet.
+
+   The camera is only ever started by an explicit tap. No preview, frame, or
+   decoded value is sent anywhere except the local Flask pairing endpoint. */
+
+/* ---------- Secure connection banner ---------- */
+
+.security-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid rgba(255, 199, 104, 0.3);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(150deg, rgba(255, 199, 104, 0.12), rgba(255, 199, 104, 0.03)),
+    rgba(6, 22, 37, 0.66);
+  box-shadow: var(--inset-light);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.security-banner > .icon {
+  width: 21px;
+  height: 21px;
+  margin-top: 0.08rem;
+  color: var(--amber);
+}
+
+.security-banner strong {
+  display: block;
+  color: #ffe0a6;
+  font-size: 0.88rem;
+}
+
+.security-banner p {
+  margin-top: 0.15rem;
+  color: #c9b48c;
+  font-size: 0.8rem;
+}
+
+.security-banner a {
+  font-weight: 650;
+}
+
+/* ---------- Scanner shell ---------- */
+
+.scanner-shell {
+  overflow: hidden;
+  padding: 1rem;
+  border-radius: var(--radius-xl);
+}
+
+.scanner-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.8rem;
+}
+
+.scanner-head h2 {
+  font-size: 1.02rem;
+}
+
+.scanner-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.6rem;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.scanner-state.is-running {
+  border-color: rgba(79, 227, 163, 0.32);
+  background: rgba(79, 227, 163, 0.09);
+  color: #8bf3c5;
+}
+
+.scanner-state.is-error {
+  border-color: rgba(255, 144, 144, 0.32);
+  background: rgba(255, 144, 144, 0.09);
+  color: #ffb3b3;
+}
+
+/* ---------- Camera stage ---------- */
+
+.camera-stage {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border: 1px solid rgba(158, 216, 255, 0.2);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(60, 200, 255, 0.1), transparent 60%),
+    linear-gradient(180deg, #071a2b, #020a12);
+  box-shadow:
+    inset 0 0 60px rgba(1, 8, 16, 0.6),
+    0 18px 40px rgba(1, 8, 16, 0.4);
+  isolation: isolate;
+}
+
+.camera-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+
+.camera-stage.is-running .camera-video {
+  opacity: 1;
+}
+
+.camera-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 1.5rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.camera-stage.is-running .camera-placeholder {
+  display: none;
+}
+
+.camera-placeholder-icon {
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 62px;
+  margin-bottom: 0.25rem;
+  border: 1px solid var(--stroke);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: 0 0 0 10px rgba(60, 200, 255, 0.05);
+}
+
+.camera-placeholder-icon .icon {
+  width: 28px;
+  height: 28px;
+}
+
+.camera-placeholder strong {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.camera-placeholder p {
+  max-width: 30ch;
+  font-size: 0.77rem;
+}
+
+.camera-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 0.8rem;
+  z-index: 3;
+  width: calc(100% - 1.6rem);
+  max-width: 420px;
+  padding: 0.42rem 0.65rem;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: rgba(3, 13, 23, 0.72);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  text-align: center;
+  transform: translateX(-50%);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+}
+
+/* ---------- Scan frame ---------- */
+
+.scan-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  width: min(72%, 300px);
+  aspect-ratio: 1 / 1;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  opacity: 0.55;
+  transition: opacity 0.25s ease;
+}
+
+.camera-stage.is-running .scan-frame {
+  opacity: 1;
+}
+
+.scan-corner {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border: 0 solid rgba(170, 240, 255, 0.95);
+  filter: drop-shadow(0 0 8px rgba(60, 200, 255, 0.55));
+}
+
+.scan-corner.tl {
+  top: 0;
+  left: 0;
+  border-top-width: 3px;
+  border-left-width: 3px;
+  border-top-left-radius: 14px;
+}
+
+.scan-corner.tr {
+  top: 0;
+  right: 0;
+  border-top-width: 3px;
+  border-right-width: 3px;
+  border-top-right-radius: 14px;
+}
+
+.scan-corner.bl {
+  bottom: 0;
+  left: 0;
+  border-bottom-width: 3px;
+  border-left-width: 3px;
+  border-bottom-left-radius: 14px;
+}
+
+.scan-corner.br {
+  bottom: 0;
+  right: 0;
+  border-bottom-width: 3px;
+  border-right-width: 3px;
+  border-bottom-right-radius: 14px;
+}
+
+.scan-line {
+  position: absolute;
+  top: 12%;
+  left: 6%;
+  right: 6%;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #8ceaff 18%, #ffffff 50%, #8ceaff 82%, transparent);
+  box-shadow: 0 0 16px rgba(90, 220, 255, 0.85);
+  opacity: 0;
+}
+
+.camera-stage.is-running .scan-line {
+  opacity: 0.95;
+  animation: scan-sweep 2.4s ease-in-out infinite;
+}
+
+@keyframes scan-sweep {
+  0%,
+  100% {
+    top: 12%;
+    opacity: 0.25;
+  }
+  50% {
+    top: 86%;
+    opacity: 0.95;
+  }
+}
+
+/* ---------- Scanner messages and controls ---------- */
+
+.scanner-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.75rem;
+}
+
+.scanner-message {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.scanner-error,
+.manual-error,
+.confirm-error {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(255, 144, 144, 0.32);
+  border-radius: 9px;
+  background: rgba(255, 144, 144, 0.08);
+  color: #ffb9b9;
+  font-size: 0.78rem;
+}
+
+.scanner-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.scanner-controls .btn {
+  flex: 1 1 140px;
+}
+
+.scanner-footnote {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--stroke);
+  color: var(--muted-2);
+  font-size: 0.72rem;
+}
+
+.scanner-footnote .icon {
+  margin-top: 0.1rem;
+  color: var(--accent);
+}
+
+/* ---------- Manual entry ---------- */
+
+.manual-panel {
+  margin-top: 0.9rem;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.manual-panel > summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 52px;
+  padding: 0.9rem 1rem;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-weight: 650;
+  cursor: pointer;
+  list-style: none;
+}
+
+.manual-panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.manual-panel > summary .icon {
+  color: var(--accent);
+}
+
+.manual-panel > summary .chevron {
+  margin-left: auto;
+  color: var(--muted-2);
+  transition: transform 0.2s ease;
+}
+
+.manual-panel[open] > summary .chevron {
+  transform: rotate(180deg);
+}
+
+.manual-body {
+  padding: 0 1rem 1rem;
+}
+
+.manual-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.7rem;
+  margin-top: 0.75rem;
+}
+
+.manual-form .btn {
+  min-height: 46px;
+}
+
+.manual-error {
+  margin-top: 0.65rem;
+}
+
+/* ---------- "What happens next" panel ---------- */
+
+.pair-note {
+  margin-top: 0.9rem;
+  padding: 1.05rem 1rem;
+  border-radius: var(--radius-lg);
+}
+
+.pair-note h2 {
+  margin-bottom: 0.55rem;
+  font-size: 1rem;
+}
+
+/* ---------- Pairing sheets (confirmation + success) ---------- */
+
+body.sheet-open {
+  overflow: hidden;
+}
+
+.pair-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  background: rgba(2, 8, 15, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: sheet-fade 0.18s ease both;
+}
+
+.pair-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+}
+
+.pair-sheet-panel {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 540px);
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 1.15rem 1.05rem calc(1.15rem + env(safe-area-inset-bottom));
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  border-bottom: 0;
+  animation: sheet-rise 0.26s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  -webkit-overflow-scrolling: touch;
+}
+
+.pair-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+}
+
+.pair-sheet-head h2 {
+  font-size: 1.08rem;
+}
+
+.sheet-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border: 1px solid var(--stroke);
+  border-radius: 13px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.sheet-icon .icon {
+  width: 22px;
+  height: 22px;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  margin-left: auto;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+}
+
+.icon-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+}
+
+.confirm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 0.8rem;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: rgba(3, 13, 23, 0.38);
+}
+
+.confirm-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgba(158, 216, 255, 0.09);
+}
+
+.confirm-list > div:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.confirm-list dt {
+  color: var(--muted-2);
+  font-size: 0.7rem;
+  font-weight: 650;
+}
+
+.confirm-list dd {
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 650;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.pair-sheet-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.8rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid rgba(255, 199, 104, 0.24);
+  border-radius: 9px;
+  background: rgba(255, 199, 104, 0.07);
+  color: #c9b48c;
+  font-size: 0.75rem;
+}
+
+.pair-sheet-warning .icon {
+  margin-top: 0.1rem;
+  color: var(--amber);
+}
+
+.pair-sheet-warning strong {
+  color: #ffe0a6;
+}
+
+.confirm-error {
+  margin-top: 0.7rem;
+}
+
+.pair-sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+}
+
+.pair-sheet-actions .btn {
+  min-height: 48px;
+}
+
+/* Success sheet */
+
+.pair-sheet-panel.is-success {
+  text-align: center;
+}
+
+.success-mark {
+  display: grid;
+  place-items: center;
+  width: 66px;
+  height: 66px;
+  margin: 0.35rem auto 0.8rem;
+  border: 1px solid rgba(79, 227, 163, 0.4);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.22), transparent 55%),
+    rgba(79, 227, 163, 0.16);
+  color: #8bf3c5;
+  box-shadow:
+    0 0 0 12px rgba(79, 227, 163, 0.06),
+    0 0 34px rgba(79, 227, 163, 0.3);
+}
+
+.success-mark .icon {
+  width: 30px;
+  height: 30px;
+  stroke-width: 2.4;
+}
+
+.pair-sheet-panel.is-success > p {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.success-device {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin: 0.7rem 0 0.2rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: rgba(3, 13, 23, 0.38);
+}
+
+.success-device strong {
+  color: var(--ink);
+}
+
+.success-device span {
+  color: var(--muted-2);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.pair-sheet-panel.is-success .panel-note {
+  max-width: 40ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@keyframes sheet-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------- Responsive ---------- */
+
+@media (min-width: 520px) {
+  .scanner-shell {
+    padding: 1.15rem;
+  }
+
+  .camera-stage {
+    aspect-ratio: 16 / 11;
+  }
+
+  .manual-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+
+  .manual-form .btn {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 720px) {
+  .pair-sheet {
+    align-items: center;
+    padding: 1.5rem;
+  }
+
+  .pair-sheet-panel {
+    max-height: 88vh;
+    padding: 1.4rem 1.35rem;
+    border-bottom: 1px solid var(--stroke);
+    border-radius: var(--radius-xl);
+    animation-name: sheet-pop;
+  }
+
+  .pair-sheet-actions {
+    flex-direction: row-reverse;
+  }
+
+  .pair-sheet-actions .btn {
+    flex: 1;
+  }
+
+  .pair-sheet-actions .btn-ghost {
+    flex: 0 1 auto;
+  }
+}
+
+@keyframes sheet-pop {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .camera-stage.is-running .scan-line {
+    animation: none;
+    top: 50%;
+  }
+
+  .pair-sheet,
+  .pair-sheet-panel {
+    animation: none;
+  }
+}
