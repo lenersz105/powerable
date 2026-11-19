@@ -67,6 +67,30 @@ class SmartOutlet(db.Model):
     # "router" or "access_point"; None until the device reports it.
     connection_type = db.Column(db.String(16), nullable=True)
 
+    # --- Dual-board ESP32 identity (added for online system) ---
+    # Permanent Hardware ESP32 identifier (e.g. PA-ESP32-A8F291C42D10).
+    hardware_esp32_id = db.Column(db.String(64), nullable=True)
+    # Permanent Network ESP32 identifier (e.g. PA-NET-12345678).
+    network_esp32_id = db.Column(db.String(64), nullable=True)
+    # Product model identifier.
+    model = db.Column(db.String(64), nullable=True)
+    # Number of independent sockets (default 3).
+    socket_count = db.Column(db.Integer, nullable=True, default=3)
+    # Per-device authentication secret hash (for per-device auth).
+    device_api_secret = db.Column(db.String(256), nullable=True)
+
+    # --- 3-socket relay states (relay_state preserved for backward compat) ---
+    relay_state_1 = db.Column(db.String(10), nullable=False, default="unknown")
+    relay_state_2 = db.Column(db.String(10), nullable=False, default="unknown")
+    relay_state_3 = db.Column(db.String(10), nullable=False, default="unknown")
+
+    # --- Wi-Fi configuration ---
+    wifi_ssid = db.Column(db.String(255), nullable=True)
+
+    # --- Mesh support ---
+    mesh_gateway = db.Column(db.Boolean, nullable=False, default=False)
+    mesh_id = db.Column(db.String(64), nullable=True)
+
     created_at = db.Column(db.DateTime, nullable=False, default=utcnow)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=utcnow, onupdate=utcnow
@@ -78,6 +102,24 @@ class SmartOutlet(db.Model):
         back_populates="outlet",
         cascade="all, delete-orphan",
         order_by="DeviceEvent.created_at.desc()",
+    )
+    relay_commands = db.relationship(
+        "RelayCommand",
+        back_populates="outlet",
+        cascade="all, delete-orphan",
+        order_by="RelayCommand.created_at.desc()",
+    )
+    energy_readings = db.relationship(
+        "EnergyReading",
+        back_populates="outlet",
+        cascade="all, delete-orphan",
+        order_by="EnergyReading.recorded_at.desc()",
+    )
+    wifi_credential = db.relationship(
+        "WifiCredential",
+        back_populates="outlet",
+        uselist=False,
+        cascade="all, delete-orphan",
     )
 
     __table_args__ = (
@@ -196,6 +238,73 @@ class SmartOutlet(db.Model):
             "registered": "Registered",
             "revoked": "Revoked",
         }.get(self.pairing_state, self.pairing_state.title())
+
+    # ------------------------------------------------------------------
+    # 3-socket relay helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def effective_socket_count(self):
+        """Return the configured socket count, defaulting to 3."""
+        return self.socket_count or 3
+
+    def get_relay_state(self, socket_number):
+        """Return the relay state for a given socket (1-based).
+
+        Falls back to the legacy ``relay_state`` field when the per-socket
+        state is still "unknown", so heartbeats that update only the legacy
+        field continue to work during the transition period.
+        """
+        if socket_number == 1:
+            state = self.relay_state_1
+        elif socket_number == 2:
+            state = self.relay_state_2
+        elif socket_number == 3:
+            state = self.relay_state_3
+        else:
+            return "unknown"
+
+        # Fall back to legacy relay_state for socket 1 during transition
+        if state == "unknown" and socket_number == 1 and self.relay_state in ("on", "off"):
+            return self.relay_state
+        return state
+
+    def set_relay_state(self, socket_number, state):
+        """Set the relay state for a given socket (1-based)."""
+        if state not in ("on", "off", "unknown"):
+            state = "unknown"
+        if socket_number == 1:
+            self.relay_state_1 = state
+        elif socket_number == 2:
+            self.relay_state_2 = state
+        elif socket_number == 3:
+            self.relay_state_3 = state
+
+    @property
+    def socket_states(self):
+        """Return a list of relay states for all configured sockets."""
+        return [
+            self.get_relay_state(i) for i in range(1, self.effective_socket_count + 1)
+        ]
+
+    @property
+    def all_sockets_online(self):
+        """True when all sockets have a known relay state."""
+        return all(s in ("on", "off") for s in self.socket_states)
+
+    # ------------------------------------------------------------------
+    # Canonical device identity
+    # ------------------------------------------------------------------
+
+    @property
+    def canonical_device_id(self):
+        """Return the Hardware ESP32 ID if set, otherwise fall back to device_uid.
+
+        The Hardware ESP32 ID is the canonical cloud device identity per the
+        online system spec.  Legacy devices that were provisioned before the
+        dual-board fields existed will continue to use device_uid.
+        """
+        return self.hardware_esp32_id or self.device_uid
 
     def __repr__(self):
         # Never include pairing material in a repr that may reach logs.

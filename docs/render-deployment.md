@@ -58,9 +58,9 @@ Confirm that `.env`, `instance/`, and real secrets are not committed.
 2. Choose **New → Blueprint**.
 3. Connect the repository and branch that contains `render.yaml`.
 4. Render reads the Blueprint and asks for the values marked `sync: false`:
-   - **DEVICE_API_KEY** — paste
-     `PowerAble_Network_2026_Rey_X82k9P` to keep the current ESP32 firmware
-     working, or let Render generate a new key.
+   - **DEVICE_API_KEY** — generate a new key
+     (`python -c "import secrets; print(secrets.token_urlsafe(32))"`) and paste
+     it here. Do not reuse an old key that was previously committed to Git.
    - **ADMIN_USERNAME / ADMIN_PASSWORD** — optional. Set both to create the
      first admin automatically. Leave both blank to skip bootstrap.
 5. Click **Apply**. Render creates the web service and the Postgres database,
@@ -103,7 +103,7 @@ Render stores `DEVICE_API_KEY` as a secret environment variable. Open
 Every ESP32 request must send:
 
 ```http
-X-Device-Key: PowerAble_Network_2026_Rey_X82k9P
+X-Device-Key: YOUR_DEVICE_API_KEY_HERE
 ```
 
 Test the deployed heartbeat after registering a device from the website:
@@ -121,7 +121,7 @@ $body = @{
 Invoke-RestMethod `
   -Method Post `
   -Uri "https://<service-name>.onrender.com/api/device/heartbeat" `
-  -Headers @{ "X-Device-Key" = "PowerAble_Network_2026_Rey_X82k9P" } `
+  -Headers @{ "X-Device-Key" = "YOUR_DEVICE_API_KEY_HERE" } `
   -ContentType "application/json" `
   -Body $body
 ```
@@ -238,7 +238,7 @@ To exercise the production configuration on Windows without Render:
 $env:SECRET_KEY = "replace-with-a-64-character-random-value"
 $env:DATABASE_URL = "sqlite:///C:/absolute/path/to/instance/prod-smoke.sqlite3"
 $env:ALLOW_SQLITE_IN_PRODUCTION = "1"
-$env:DEVICE_API_KEY = "PowerAble_Network_2026_Rey_X82k9P"
+$env:DEVICE_API_KEY = "YOUR_DEVICE_API_KEY_HERE"
 $env:ADMIN_USERNAME = "installer"
 $env:ADMIN_PASSWORD = "correct-horse-9"
 $env:SESSION_COOKIE_SECURE = "0"   # only because this smoke test uses HTTP

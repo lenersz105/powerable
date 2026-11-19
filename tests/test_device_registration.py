@@ -10,7 +10,7 @@ from tests.support import form_post, provision, register
 DEVICE = "PA-ESP32-A8F291C42D10"
 SECOND_DEVICE = "PA-ESP32-001122334455"
 HEARTBEAT = "/api/device/heartbeat"
-DEVICE_KEY = "PowerAble_Network_2026_Rey_X82k9P"
+DEVICE_KEY = "test-device-key-do-not-use"
 DEVICE_HEADERS = {"X-Device-Key": DEVICE_KEY}
 
 

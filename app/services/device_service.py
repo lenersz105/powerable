@@ -12,7 +12,9 @@ online. Connection status stays "unknown" until real hardware telemetry
 is received by a future stage.
 """
 
+import hashlib
 import ipaddress
+import secrets
 
 from flask import current_app
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -45,6 +47,18 @@ class DeviceError(PairingError):
 def serialize_outlet(outlet):
     """Return only non-secret outlet fields for JSON responses."""
 
+    # Build per-socket relay states
+    socket_count = outlet.effective_socket_count
+    sockets = {}
+    for i in range(1, socket_count + 1):
+        state = outlet.get_relay_state(i)
+        sockets[i] = {
+            "relay_state": state,
+            "is_on": state == "on",
+            "is_off": state == "off",
+            "is_unknown": state == "unknown",
+        }
+
     return {
         "device_id": outlet.device_uid,
         "device_type": outlet.device_type,
@@ -76,12 +90,25 @@ def serialize_outlet(outlet):
         "network_mode_label": outlet.network_mode_label,
         "connection_type": outlet.connection_type,
         "connection_type_label": outlet.connection_type_label,
+        # Legacy single relay state (backward compat)
         "relay_state": outlet.relay_state,
         "outlet_state": (
             outlet.relay_state == "on"
             if outlet.relay_state in ("on", "off")
             else None
         ),
+        # 3-socket support
+        "socket_count": socket_count,
+        "sockets": sockets,
+        # Dual-board ESP32 identity
+        "hardware_esp32_id": outlet.hardware_esp32_id,
+        "network_esp32_id": outlet.network_esp32_id,
+        "model": outlet.model,
+        # Wi-Fi status
+        "wifi_ssid": outlet.wifi_ssid,
+        # Mesh
+        "mesh_gateway": outlet.mesh_gateway,
+        "mesh_id": outlet.mesh_id,
         "last_seen_at": to_iso(outlet.last_seen_at),
         "last_seen_label": outlet.last_seen_label,
         "registered_at": to_iso(outlet.registered_at),
@@ -91,12 +118,48 @@ def serialize_outlet(outlet):
     }
 
 
-def provision_device(device_uid, device_type=None):
+def _generate_device_secret():
+    """Generate a cryptographically random per-device API secret.
+
+    Returns a 32-byte URL-safe token suitable for provisioning into the
+    Network ESP32 firmware.  The plaintext is returned so it can be stored
+    in the device; only its hash is kept in the database.
+    """
+    return secrets.token_urlsafe(32)
+
+
+def _hash_device_secret(plaintext_secret):
+    """Hash a per-device secret for storage.
+
+    Uses SHA-256 — the same algorithm as device_auth.py::_hash_secret —
+    so the auth layer can verify the stored hash.
+    """
+    return hashlib.sha256(plaintext_secret.encode("utf-8")).hexdigest()
+
+
+def provision_device(
+    device_uid,
+    device_type=None,
+    hardware_esp32_id=None,
+    network_esp32_id=None,
+    model=None,
+    socket_count=None,
+):
     """Create or rotate a pairing code for a physical outlet.
 
-    This is an installer/admin action used by the Flask CLI. It returns
-    ``(outlet, plaintext_code, payload)``. The plaintext code is shown
-    once so it can be printed into a label; only its hash is stored.
+    This is an installer/admin action used by the Flask CLI and the admin
+    console.  It returns ``(outlet, plaintext_code, payload, device_secret)``.
+    The plaintext code and device secret are shown once so they can be
+    printed into a label / flashed into the Network ESP32; only their
+    hashes are stored.
+
+    Args:
+        device_uid: The canonical device UID.
+        device_type: Human-readable type label.
+        hardware_esp32_id: Permanent Hardware ESP32 identifier.
+        network_esp32_id: Permanent Network ESP32 identifier.
+        model: Product model identifier.
+        socket_count: Number of independent sockets (default 3).
     """
 
     device_id = qr_service.normalize_device_id(device_uid)
@@ -112,6 +175,8 @@ def provision_device(device_uid, device_type=None):
         )
 
     code = qr_service.generate_pairing_code()
+    device_secret = _generate_device_secret()
+
     if outlet is None:
         outlet = SmartOutlet(device_uid=device_id, pairing_state="available")
         db.session.add(outlet)
@@ -123,6 +188,30 @@ def provision_device(device_uid, device_type=None):
 
     if device_type:
         outlet.device_type = device_type.strip()[:64]
+
+    # Dual-board ESP32 identity
+    if hardware_esp32_id:
+        outlet.hardware_esp32_id = hardware_esp32_id.strip()[:64]
+    if network_esp32_id:
+        outlet.network_esp32_id = network_esp32_id.strip()[:64]
+
+    # Product information
+    if model:
+        outlet.model = model.strip()[:64]
+    if socket_count is not None:
+        try:
+            socket_count = int(socket_count)
+            if 1 <= socket_count <= 8:
+                outlet.socket_count = socket_count
+            else:
+                outlet.socket_count = 3
+        except (ValueError, TypeError):
+            outlet.socket_count = 3
+    elif outlet.socket_count is None:
+        outlet.socket_count = 3
+
+    # Per-device authentication secret (hashed)
+    outlet.device_api_secret = _hash_device_secret(device_secret)
 
     outlet.pairing_token_hash = qr_service.hash_pairing_code(code)
     outlet.connection_status = "unknown"
@@ -143,7 +232,7 @@ def provision_device(device_uid, device_type=None):
     )
     db.session.commit()
 
-    return outlet, code, qr_service.build_payload(device_id, code)
+    return outlet, code, qr_service.build_payload(device_id, code), device_secret
 
 
 def get_outlet_by_device_id(device_id):
@@ -578,6 +667,44 @@ def _parse_relay_state(payload):
     return _UNSET
 
 
+def _parse_relay_states(payload):
+    """Parse per-socket relay states from the heartbeat payload.
+
+    Supports two formats:
+    1. ``relay_states`` dict: ``{"1": "on", "2": "off", "3": "off"}``
+    2. Individual fields: ``relay_state_1``, ``relay_state_2``, ``relay_state_3``
+
+    Returns a dict of ``{socket_number: state}`` for sockets that changed.
+    """
+    states = {}
+
+    # Format 1: relay_states dict
+    relay_states_obj = payload.get("relay_states")
+    if isinstance(relay_states_obj, dict):
+        for key, value in relay_states_obj.items():
+            try:
+                socket_num = int(key)
+            except (ValueError, TypeError):
+                continue
+            if socket_num not in (1, 2, 3):
+                continue
+            if isinstance(value, str):
+                normalized = value.strip().lower()
+                if normalized in ("on", "off", "unknown"):
+                    states[socket_num] = normalized
+
+    # Format 2: individual fields (relay_state_1, relay_state_2, relay_state_3)
+    for socket_num in (1, 2, 3):
+        field = f"relay_state_{socket_num}"
+        value = payload.get(field)
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in ("on", "off", "unknown"):
+                states[socket_num] = normalized
+
+    return states
+
+
 def process_heartbeat(payload):
     """Apply a heartbeat for an already registered device.
 
@@ -589,13 +716,17 @@ def process_heartbeat(payload):
           "connection_type": "router",
           "ip_address": "192.168.1.120",
           "hardware_status": "CONNECTED",
-          "relay_state": "OFF"
+          "relay_state": "OFF",
+          "relay_states": {"1": "on", "2": "off", "3": "off"}
         }
 
     The earlier fields ``outlet_state`` (bool) and ``hardware_connected``
     (bool) still work. Unknown devices are rejected; this function never
     creates a row and never changes an outlet owned by someone else. Only
     fields present in the payload are changed.
+
+    Per-socket relay states are supported via ``relay_states`` dict or
+    individual ``relay_state_1``, ``relay_state_2``, ``relay_state_3`` fields.
     """
 
     if not isinstance(payload, dict):
@@ -645,6 +776,7 @@ def process_heartbeat(payload):
     )
     hardware_state = _parse_hardware_state(payload)
     relay_state = _parse_relay_state(payload)
+    per_socket_states = _parse_relay_states(payload)
 
     if ip_address:
         outlet.ip_address = ip_address
@@ -656,6 +788,13 @@ def process_heartbeat(payload):
         outlet.hardware_connected = hardware_state
     if relay_state is not _UNSET:
         outlet.relay_state = relay_state
+
+    # Update per-socket relay states
+    for socket_num, state in per_socket_states.items():
+        outlet.set_relay_state(socket_num, state)
+        # Also update legacy relay_state for socket 1 for backward compat
+        if socket_num == 1 and state in ("on", "off"):
+            outlet.relay_state = state
 
     now = utcnow()
     outlet.last_seen_at = now

@@ -136,7 +136,7 @@ class TestingConfig(Config):
     PUBLIC_PORT = 5000
     DEVICE_HEARTBEAT_TIMEOUT_SECONDS = 60
     # Deterministic device key for tests; never used outside pytest.
-    DEVICE_API_KEY = "PowerAble_Network_2026_Rey_X82k9P"
+    DEVICE_API_KEY = "test-device-key-do-not-use"
     # Valid Fernet key for Wi-Fi encryption tests (32-byte url-safe base64).
     WIFI_ENCRYPTION_KEY = "ZmFrZS1mZXJuZXQta2V5LWZvci10ZXN0aW5nLW9ubHk="
 

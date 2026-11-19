@@ -47,6 +47,10 @@ def _form_values():
         "device_id": request.form.get("device_id", "").strip(),
         "device_type": request.form.get("device_type", "").strip()
         or DEFAULT_DEVICE_TYPE,
+        "hardware_esp32_id": request.form.get("hardware_esp32_id", "").strip() or None,
+        "network_esp32_id": request.form.get("network_esp32_id", "").strip() or None,
+        "model": request.form.get("model", "").strip() or None,
+        "socket_count": request.form.get("socket_count", "").strip() or None,
     }
 
 
@@ -54,8 +58,8 @@ def _flash_error(error):
     flash(getattr(error, "message", str(error)), "error")
 
 
-def _render_label(outlet, pairing_code):
-    """Render the one-time label response. The code is never stored in a session."""
+def _render_label(outlet, pairing_code, device_secret=None):
+    """Render the one-time label response. The code and secret are never stored in a session."""
 
     payload = qr_service.build_payload(outlet.device_uid, pairing_code)
     qr_svg = segno.make(payload, error="m").svg_inline(
@@ -67,6 +71,7 @@ def _render_label(outlet, pairing_code):
             title=f"Pairing label · {outlet.device_uid}",
             outlet=outlet,
             pairing_code=pairing_code,
+            device_secret=device_secret,
             qr_svg=qr_svg,
         )
     )
@@ -135,20 +140,28 @@ def new_outlet():
     values = {
         "device_id": "",
         "device_type": DEFAULT_DEVICE_TYPE,
+        "hardware_esp32_id": "",
+        "network_esp32_id": "",
+        "model": "",
+        "socket_count": "3",
     }
 
     if request.method == "POST":
         values = _form_values()
         try:
-            outlet, code, _payload = admin_service.provision_outlet(
+            outlet, code, _payload, device_secret = admin_service.provision_outlet(
                 current_user,
                 values["device_id"],
                 device_type=values["device_type"],
+                hardware_esp32_id=values.get("hardware_esp32_id"),
+                network_esp32_id=values.get("network_esp32_id"),
+                model=values.get("model"),
+                socket_count=values.get("socket_count"),
             )
         except (AdminError, PairingError) as error:
             _flash_error(error)
         else:
-            return _render_label(outlet, code)
+            return _render_label(outlet, code, device_secret=device_secret)
 
     return render_template(
         "admin/new_label.html",
@@ -162,16 +175,20 @@ def new_outlet():
 def rotate_outlet(outlet_id):
     outlet = _outlet_or_404(outlet_id)
     try:
-        outlet, code, _payload = admin_service.provision_outlet(
+        outlet, code, _payload, device_secret = admin_service.provision_outlet(
             current_user,
             outlet.device_uid,
             device_type=outlet.device_type,
+            hardware_esp32_id=outlet.hardware_esp32_id,
+            network_esp32_id=outlet.network_esp32_id,
+            model=outlet.model,
+            socket_count=outlet.socket_count,
         )
     except (AdminError, PairingError) as error:
         _flash_error(error)
         return redirect(url_for("admin.outlets"))
 
-    return _render_label(outlet, code)
+    return _render_label(outlet, code, device_secret=device_secret)
 
 
 @admin_bp.post("/outlets/<int:outlet_id>/rename")

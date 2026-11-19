@@ -70,7 +70,7 @@ The ESP32 network controller sends a JSON heartbeat over the local network:
 ```http
 POST /api/device/heartbeat
 Content-Type: application/json
-X-Device-Key: PowerAble_Network_2026_Rey_X82k9P
+X-Device-Key: YOUR_DEVICE_API_KEY_HERE
 
 {
   "device_id": "PA-NET-12345678",

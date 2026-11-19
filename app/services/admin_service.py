@@ -197,24 +197,56 @@ def recent_admin_actions(limit=12):
 # ----------------------------------------------------------------------
 
 
-def provision_outlet(actor, device_id, device_type="Smart Power Outlet"):
-    """Create or rotate a single-use QR label for a physical outlet."""
+def provision_outlet(
+    actor,
+    device_id,
+    device_type="Smart Power Outlet",
+    hardware_esp32_id=None,
+    network_esp32_id=None,
+    model=None,
+    socket_count=None,
+):
+    """Create or rotate a single-use QR label for a physical outlet.
+
+    Args:
+        actor: The admin user.
+        device_id: The canonical device UID.
+        device_type: Human-readable type label.
+        hardware_esp32_id: Permanent Hardware ESP32 identifier.
+        network_esp32_id: Permanent Network ESP32 identifier.
+        model: Product model identifier.
+        socket_count: Number of independent sockets (default 3).
+
+    Returns:
+        Tuple of (outlet, pairing_code, payload, device_secret).
+        The device_secret is the plaintext per-device API secret for
+        provisioning into the Network ESP32 firmware.
+    """
 
     require_admin(actor)
 
-    outlet, code, payload = device_service.provision_device(
+    outlet, code, payload, device_secret = device_service.provision_device(
         device_id,
         device_type=_clean(device_type, 64) or "Smart Power Outlet",
+        hardware_esp32_id=hardware_esp32_id,
+        network_esp32_id=network_esp32_id,
+        model=model,
+        socket_count=socket_count,
     )
+
+    description = "New single-use pairing label generated."
+    if hardware_esp32_id or network_esp32_id:
+        description += " Dual-board ESP32 IDs recorded."
+    description += " Per-device API secret provisioned."
 
     log_action(
         actor,
         "outlet.provisioned",
         outlet.device_uid,
-        "New single-use pairing label generated.",
+        description,
         commit=True,
     )
-    return outlet, code, payload
+    return outlet, code, payload, device_secret
 
 
 def rename_outlet(actor, outlet, name):

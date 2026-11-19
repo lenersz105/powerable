@@ -1,4 +1,4 @@
-"""JSON API: secure QR pairing, owner-scoped reads, and heartbeats.
+"""JSON API: secure QR pairing, owner-scoped reads, heartbeats, and relay control.
 
 Endpoints:
     POST /api/pairing/validate
@@ -6,6 +6,11 @@ Endpoints:
     GET  /api/devices
     GET  /api/devices/<device_id>
     POST /api/device/heartbeat
+    POST /api/device/<device_id>/relay        (owner issues relay command)
+    GET  /api/device/commands                 (ESP32 polls for commands)
+    POST /api/device/commands/<id>/ack        (ESP32 acknowledges command)
+    POST /api/device/telemetry                (ESP32 sends energy readings)
+    POST /api/device/<device_id>/wifi-setup   (owner configures Wi-Fi)
 
 Browser pairing/read requests require an authenticated session and, for
 mutations, a valid CSRF token in the X-CSRF-Token header. The heartbeat is
@@ -22,8 +27,13 @@ from flask import Blueprint, jsonify, request, session
 from flask_login import current_user, login_required
 
 from app.device_auth import require_device_key
-from app.services import device_service
+from app.services import device_service, qr_service
 from app.services.device_service import PairingError
+from app.services.relay_service import RelayError, issue_relay_command, get_pending_commands, acknowledge_command, serialize_command
+from app.services import energy_service
+from app.services.energy_service import EnergyError
+from app.services import wifi_service
+from app.services.wifi_service import WifiError
 
 api_bp = Blueprint("api", __name__)
 
@@ -220,3 +230,255 @@ def get_device(device_id):
             404,
         )
     return jsonify(ok=True, device=device_service.serialize_outlet(outlet))
+
+
+# ------------------------------------------------------------------
+# Relay control
+# ------------------------------------------------------------------
+
+
+@api_bp.post("/device/<device_id>/relay")
+@login_required
+def relay_control(device_id):
+    """Issue a relay command for a specific socket on an owned outlet."""
+
+    outlet = device_service.get_user_outlet(current_user.id, device_id)
+    if outlet is None:
+        return (
+            jsonify(
+                ok=False,
+                error="not_found",
+                message="That outlet is not registered to your account.",
+            ),
+            404,
+        )
+
+    data = _json_body()
+    if not data:
+        return _error(PairingError("Send a JSON body.", status=400, code="invalid_request"))
+
+    socket_number = data.get("socket_number")
+    desired_state = data.get("desired_state")
+
+    if not isinstance(socket_number, int) or socket_number not in (1, 2, 3):
+        return _error(RelayError("socket_number must be 1, 2, or 3.", status=400, code="invalid_socket"))
+
+    if desired_state not in ("on", "off"):
+        return _error(RelayError("desired_state must be 'on' or 'off'.", status=400, code="invalid_state"))
+
+    try:
+        cmd = issue_relay_command(outlet, socket_number, desired_state, user_id=current_user.id)
+    except RelayError as error:
+        return _error(error)
+
+    return jsonify(
+        ok=True,
+        message=f"Relay command queued for socket {socket_number}.",
+        command=serialize_command(cmd),
+    )
+
+
+@api_bp.get("/device/commands")
+@require_device_key
+def poll_commands():
+    """ESP32 polls for pending relay commands."""
+
+    data = request.args
+    device_id = data.get("device_id", "")
+
+    if not device_id:
+        return _error(PairingError("device_id query parameter is required.", status=400, code="invalid_request"))
+
+    try:
+        normalized = qr_service.normalize_esp32_device_id(device_id)
+    except qr_service.QRFormatError as error:
+        return _error(PairingError(str(error), status=400, code="invalid_device_id"))
+
+    outlet = device_service.get_outlet_by_device_id(normalized)
+    if outlet is None or not outlet.is_registered:
+        return _error(PairingError("Device not registered.", status=404, code="unknown_device"))
+
+    commands = get_pending_commands(outlet.id)
+    return jsonify(
+        ok=True,
+        commands=[serialize_command(cmd) for cmd in commands],
+        count=len(commands),
+    )
+
+
+@api_bp.post("/device/commands/<command_id>/ack")
+@require_device_key
+def ack_command(command_id):
+    """ESP32 acknowledges a relay command after execution."""
+
+    data = _json_body()
+    if not data:
+        return _error(PairingError("Send a JSON body with device_id.", status=400, code="invalid_request"))
+
+    device_id = data.get("device_id", "")
+    if not device_id:
+        return _error(PairingError("device_id is required.", status=400, code="invalid_request"))
+
+    try:
+        normalized = qr_service.normalize_esp32_device_id(device_id)
+    except qr_service.QRFormatError as error:
+        return _error(PairingError(str(error), status=400, code="invalid_device_id"))
+
+    outlet = device_service.get_outlet_by_device_id(normalized)
+    if outlet is None or not outlet.is_registered:
+        return _error(PairingError("Device not registered.", status=404, code="unknown_device"))
+
+    socket_state = data.get("socket_state")
+    if socket_state is not None and socket_state not in ("on", "off"):
+        return _error(PairingError("socket_state must be 'on' or 'off'.", status=400, code="invalid_request"))
+
+    try:
+        cmd = acknowledge_command(command_id, outlet.id, socket_state=socket_state)
+    except RelayError as error:
+        return _error(error)
+
+    return jsonify(
+        ok=True,
+        message="Command acknowledged.",
+        command=serialize_command(cmd),
+    )
+
+
+# ------------------------------------------------------------------
+# Telemetry
+# ------------------------------------------------------------------
+
+
+@api_bp.post("/device/telemetry")
+@require_device_key
+def device_telemetry():
+    """ESP32 sends energy readings from PZEM-004T sensors."""
+
+    data = _json_body()
+    if not data:
+        return _error(PairingError("Send a JSON body with device_id.", status=400, code="invalid_request"))
+
+    device_id = data.get("device_id", "")
+    if not device_id:
+        return _error(PairingError("device_id is required.", status=400, code="invalid_request"))
+
+    try:
+        normalized = qr_service.normalize_esp32_device_id(device_id)
+    except qr_service.QRFormatError as error:
+        return _error(PairingError(str(error), status=400, code="invalid_device_id"))
+
+    outlet = device_service.get_outlet_by_device_id(normalized)
+    if outlet is None or not outlet.is_registered:
+        return _error(PairingError("Device not registered.", status=404, code="unknown_device"))
+
+    socket_number = data.get("socket_number", 1)
+    if not isinstance(socket_number, int) or socket_number not in (1, 2, 3):
+        return _error(EnergyError("socket_number must be 1, 2, or 3.", status=400, code="invalid_socket"))
+
+    # Extract telemetry data (all optional)
+    telemetry_data = {}
+    for key in ("voltage", "current", "power_watts", "energy_kwh", "frequency", "power_factor"):
+        if key in data:
+            telemetry_data[key] = data[key]
+
+    if not telemetry_data:
+        return _error(EnergyError("At least one measurement field is required.", status=400, code="invalid_request"))
+
+    try:
+        reading = energy_service.ingest_telemetry(outlet.id, socket_number, telemetry_data)
+    except EnergyError as error:
+        return _error(error)
+
+    return jsonify(
+        ok=True,
+        message="Telemetry received.",
+        reading=energy_service.serialize_reading(reading),
+    )
+
+
+@api_bp.get("/monitoring/readings")
+@login_required
+def monitoring_readings():
+    """Dashboard fetches energy readings for charts."""
+
+    device_id = request.args.get("device_id", "")
+    if not device_id:
+        return _error(PairingError("device_id query parameter is required.", status=400, code="invalid_request"))
+
+    outlet = device_service.get_user_outlet(current_user.id, device_id)
+    if outlet is None:
+        return (
+            jsonify(
+                ok=False,
+                error="not_found",
+                message="That outlet is not registered to your account.",
+            ),
+            404,
+        )
+
+    socket_number = request.args.get("socket_number", 1, type=int)
+    hours = request.args.get("hours", 24, type=int)
+    interval = request.args.get("interval", 5, type=int)
+
+    if socket_number not in (1, 2, 3):
+        socket_number = 1
+
+    chart_data = energy_service.get_readings_for_chart(
+        outlet.id, socket_number, hours=hours, interval_minutes=interval
+    )
+
+    # Also get the latest reading for live display
+    latest = energy_service.get_latest_readings(outlet.id, socket_number, limit=1)
+    latest_reading = energy_service.serialize_reading(latest[0]) if latest else None
+
+    return jsonify(
+        ok=True,
+        chart=chart_data,
+        latest=latest_reading,
+        socket_number=socket_number,
+    )
+
+
+# ------------------------------------------------------------------
+# Wi-Fi setup
+# ------------------------------------------------------------------
+
+
+@api_bp.post("/device/<device_id>/wifi-setup")
+@login_required
+def wifi_setup(device_id):
+    """Customer configures Wi-Fi credentials for their owned outlet."""
+
+    outlet = device_service.get_user_outlet(current_user.id, device_id)
+    if outlet is None:
+        return (
+            jsonify(
+                ok=False,
+                error="not_found",
+                message="That outlet is not registered to your account.",
+            ),
+            404,
+        )
+
+    data = _json_body()
+    if not data:
+        return _error(PairingError("Send a JSON body.", status=400, code="invalid_request"))
+
+    ssid = data.get("ssid", "")
+    password = data.get("password", "")
+
+    try:
+        credential = wifi_service.setup_wifi(outlet.id, ssid, password)
+    except WifiError as error:
+        return _error(error)
+
+    # Update the outlet's wifi_ssid field for quick reference
+    outlet.wifi_ssid = credential.ssid
+    from app.extensions import db as db_ext
+    db_ext.session.commit()
+
+    return jsonify(
+        ok=True,
+        message="Wi-Fi credentials saved.",
+        wifi=wifi_service.serialize_wifi_status(credential),
+    )

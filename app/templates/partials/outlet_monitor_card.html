@@ -11,14 +11,25 @@
     </div>
   </header>
 
-  <div class="monitor-relay">
-    <span class="relay-state is-{{ relay_tone }}" data-relay-state>Relay: {{ outlet.relay_label }}</span>
-    <label class="switch" title="Relay control requires confirmed hardware communication">
-      <input type="checkbox" data-relay-toggle disabled
-             {% if outlet.relay_state == 'on' %}checked{% endif %}
-             aria-label="{{ outlet.display_name }} relay">
-      <span class="switch-track"><span class="switch-thumb"></span></span>
-    </label>
+  <div class="monitor-relay monitor-relay-multi" data-socket-count="{{ outlet.effective_socket_count }}">
+    {% for socket_num in range(1, outlet.effective_socket_count + 1) %}
+    {% set socket_state = outlet.get_relay_state(socket_num) %}
+    {% set socket_tone = socket_state if socket_state in ['on', 'off'] else 'unknown' %}
+    <div class="socket-control" data-socket="{{ socket_num }}">
+      <span class="socket-label">Socket {{ socket_num }}</span>
+      <span class="relay-state is-{{ socket_tone }}" data-relay-state-socket="{{ socket_num }}">
+        {% if socket_num == 1 %}Relay: {{ {'on': 'ON', 'off': 'OFF'}.get(socket_state, '—') }}{% else %}{{ {'on': 'ON', 'off': 'OFF'}.get(socket_state, '—') }}{% endif %}
+      </span>
+      <button type="button"
+              class="btn btn-sm btn-relay {% if socket_state == 'on' %}btn-relay-on{% else %}btn-relay-off{% endif %}"
+              data-relay-toggle
+              data-socket="{{ socket_num }}"
+              {% if not outlet.is_online %}disabled title="Outlet is offline"{% endif %}
+              aria-label="{{ outlet.display_name }} socket {{ socket_num }} relay">
+        {% if socket_state == 'on' %}OFF{% else %}ON{% endif %}
+      </button>
+    </div>
+    {% endfor %}
   </div>
 
   <dl class="monitor-connection" aria-label="{{ outlet.display_name }} connection details">

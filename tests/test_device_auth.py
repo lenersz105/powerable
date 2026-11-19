@@ -5,7 +5,7 @@ from app.models import SmartOutlet
 from tests.support import register
 
 HEARTBEAT = "/api/device/heartbeat"
-DEVICE_KEY = "PowerAble_Network_2026_Rey_X82k9P"
+DEVICE_KEY = "test-device-key-do-not-use"
 HEADERS = {"X-Device-Key": DEVICE_KEY}
 NET_DEVICE = "PA-NET-12345678"
 

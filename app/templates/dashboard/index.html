@@ -59,8 +59,8 @@
       </div>
 
       <div class="monitor-actions">
-        <button type="button" class="btn btn-success" disabled title="Requires a confirmed online device">All ON</button>
-        <button type="button" class="btn btn-danger" disabled title="Requires a confirmed online device">All OFF</button>
+        <button type="button" class="btn btn-success" id="all-on-btn" title="Turn all sockets ON">All ON</button>
+        <button type="button" class="btn btn-danger" id="all-off-btn" title="Turn all sockets OFF">All OFF</button>
         <button type="button" class="btn btn-ghost" disabled title="Voice control is a future feature">
           {{ icon('volume') }} Voice Command <span class="tag">Planned</span>
         </button>
@@ -69,8 +69,8 @@
 
     <p class="monitor-note">
       {{ icon('info') }}
-      Controls are intentionally disabled. This stage has no telemetry or command transport yet, so
-      clicking a toggle could not reach a relay. Confirmed hardware state is required before the UI changes.
+      Relay controls send commands to the ESP32. The dashboard updates when the hardware confirms the new state.
+      Electrical readings appear only after verified PZEM-004T telemetry arrives.
     </p>
 
     <div class="monitor-grid">

@@ -79,13 +79,17 @@ def api_post(client, path, payload):
 
 
 def provision(app, device_id="PA-ESP32-0001"):
-    """Provision a physical outlet directly through the service layer."""
+    """Provision a physical outlet directly through the service layer.
+
+    Returns a dict with outlet_id, device_id, code, payload, and device_secret.
+    """
 
     with app.app_context():
-        outlet, code, payload = provision_device(device_id)
+        outlet, code, payload, device_secret = provision_device(device_id)
         return {
             "outlet_id": outlet.id,
             "device_id": outlet.device_uid,
             "code": code,
             "payload": payload,
+            "device_secret": device_secret,
         }

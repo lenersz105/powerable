@@ -239,13 +239,13 @@ computer.
 
 The ESP32 Network Handler authenticates with a shared secret. Configure it in
 `app/config.py` through the `DEVICE_API_KEY` environment variable. The
-development fallback is `PowerAble_Network_2026_Rey_X82k9P`; production has no
-fallback and refuses device traffic until the variable is set.
+development fallback is a dev-only placeholder; production has no fallback and
+refuses device traffic until the variable is set.
 
 Windows PowerShell (current session):
 
 ```powershell
-$env:DEVICE_API_KEY = "PowerAble_Network_2026_Rey_X82k9P"
+$env:DEVICE_API_KEY = "YOUR_DEVICE_API_KEY_HERE"
 ```
 
 Persist it for new terminals:
@@ -253,7 +253,7 @@ Persist it for new terminals:
 ```powershell
 [System.Environment]::SetEnvironmentVariable(
   "DEVICE_API_KEY",
-  "PowerAble_Network_2026_Rey_X82k9P",
+  "YOUR_DEVICE_API_KEY_HERE",
   "User"
 )
 ```
@@ -261,7 +261,7 @@ Persist it for new terminals:
 Every device request carries the exact header:
 
 ```http
-X-Device-Key: PowerAble_Network_2026_Rey_X82k9P
+X-Device-Key: YOUR_DEVICE_API_KEY_HERE
 ```
 
 Missing header → `401`; wrong key → `403`. The key is never written to the
@@ -275,7 +275,7 @@ Once registered, the network controller posts its state to
 ```http
 POST /api/device/heartbeat
 Content-Type: application/json
-X-Device-Key: PowerAble_Network_2026_Rey_X82k9P
+X-Device-Key: YOUR_DEVICE_API_KEY_HERE
 
 {
   "device_id": "PA-NET-12345678",

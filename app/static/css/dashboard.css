@@ -715,6 +715,88 @@
   border-bottom: 1px solid var(--stroke);
 }
 
+/* ---------- 3-socket relay controls ---------- */
+
+.monitor-relay-multi {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.socket-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: 8px;
+  background: rgba(3, 13, 23, 0.35);
+  border: 1px solid var(--stroke);
+}
+
+.socket-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  min-width: 62px;
+}
+
+.btn-relay {
+  margin-left: auto;
+  min-width: 64px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 8px;
+  padding: 0.4rem 0.8rem;
+  transition: all 0.2s ease;
+}
+
+.btn-relay-on {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: #fff;
+  border: 1px solid #2563eb;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.35);
+}
+
+.btn-relay-on:hover:not(:disabled) {
+  background: linear-gradient(135deg, #60a5fa, #3b82f6);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.5);
+}
+
+.btn-relay-off {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-relay-off:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.35);
+}
+
+.btn-relay:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.relay-state.is-on {
+  color: #60a5fa;
+  font-weight: 700;
+}
+
+.relay-state.is-off {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.relay-state.is-unknown {
+  color: #64748b;
+  font-style: italic;
+}
+
 .monitor-measurements {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
