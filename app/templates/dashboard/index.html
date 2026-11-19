@@ -10,9 +10,9 @@
       <p class="eyebrow">Live Outlet Monitor</p>
       <h1>Live Dashboard</h1>
       <p class="page-subtitle">
-        Registration details and heartbeats as reported by the ESP32 network
-        controller. Measurements stay at zero until verified PZEM-004T readings
-        arrive; nothing on this page is estimated or simulated.
+        Registration details, heartbeats, and real-time electricity measurements
+        as reported by the ESP32 network controller. Energy readings update every
+        5 seconds from verified PZEM-004T telemetry; nothing is estimated or simulated.
       </p>
     </div>
     <div class="heading-meta">
@@ -74,7 +74,7 @@
     <p class="monitor-note">
       {{ icon('info') }}
       Relay controls send commands to the ESP32. The dashboard updates when the hardware confirms the new state.
-      Electrical readings appear only after verified PZEM-004T telemetry arrives.
+      Electricity measurements update every 5 seconds from verified PZEM-004T telemetry — no simulated data.
     </p>
 
     <div class="monitor-grid">
@@ -86,12 +86,13 @@
     <div class="notice notice-neutral" role="status">
       {{ icon('activity') }}
       <div>
-        <strong>Heartbeats update connection state, not measurements.</strong>
+        <strong>Real-time electricity monitoring.</strong>
         <p>
-          The ESP32 reports its IP, relay state, and hardware-controller link to
-          <code>/api/device/heartbeat</code>. Refresh this page to see the latest values.
-          Electrical readings stay at zero with an “awaiting data” state until verified
-          PZEM telemetry is added.
+          The ESP32 sends verified PZEM-004T telemetry to
+          <code>/api/device/telemetry</code>. The dashboard updates measurements every
+          5 seconds. "No Reading" means the sensor has not reported yet; "Stale" means
+          the last reading is older than 60 seconds. Estimated cost is calculated using
+          the configured electricity rate (PHP/kWh).
         </p>
       </div>
     </div>

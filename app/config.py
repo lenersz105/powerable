@@ -111,6 +111,12 @@ class Config:
     # Falls back to SECRET_KEY if not set, but should be separate in production.
     WIFI_ENCRYPTION_KEY = os.environ.get("WIFI_ENCRYPTION_KEY", "")
 
+    # Electricity rate in PHP per kWh for cost estimation on the dashboard.
+    # Philippine average residential rate is approximately PHP 12-18/kWh.
+    ELECTRICITY_RATE_PHP_KWH = float(
+        os.environ.get("ELECTRICITY_RATE_PHP_KWH", "14.0")
+    )
+
     # Application-level metadata shown on the About page.
     APP_NAME = "PowerAble"
 

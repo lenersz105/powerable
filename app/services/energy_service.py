@@ -121,6 +121,55 @@ def get_latest_readings(outlet_id, socket_number=None, limit=1):
     return list(db.session.scalars(stmt))
 
 
+def get_latest_all_sockets(outlet_ids):
+    """Get the latest reading for every socket of every outlet in a list.
+
+    Uses a correlated subquery to fetch exactly one row per
+    (outlet_id, socket_number) combination — the most recent one.
+
+    Args:
+        outlet_ids: List of SmartOutlet IDs belonging to the current user.
+
+    Returns:
+        Dict mapping outlet_id -> {socket_number -> serialized reading dict}.
+        Missing sockets return None (no reading yet).
+    """
+    if not outlet_ids:
+        return {}
+
+    # Subquery: find the max recorded_at per (outlet_id, socket_number)
+    sub = (
+        db.select(
+            EnergyReading.outlet_id,
+            EnergyReading.socket_number,
+            func.max(EnergyReading.recorded_at).label("max_recorded_at"),
+        )
+        .filter(EnergyReading.outlet_id.in_(outlet_ids))
+        .group_by(EnergyReading.outlet_id, EnergyReading.socket_number)
+        .subquery()
+    )
+
+    # Join back to get the full rows
+    readings = (
+        db.session.scalars(
+            db.select(EnergyReading)
+            .join(
+                sub,
+                (EnergyReading.outlet_id == sub.c.outlet_id)
+                & (EnergyReading.socket_number == sub.c.socket_number)
+                & (EnergyReading.recorded_at == sub.c.max_recorded_at),
+            )
+        )
+    ).all()
+
+    # Build nested dict: outlet_id -> socket_number -> reading
+    result = {oid: {} for oid in outlet_ids}
+    for r in readings:
+        result.setdefault(r.outlet_id, {})[r.socket_number] = serialize_reading(r)
+
+    return result
+
+
 def get_readings_for_chart(outlet_id, socket_number, hours=24, interval_minutes=5):
     """Get aggregated readings for a chart.
 

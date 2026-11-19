@@ -3,13 +3,16 @@
    - Local clock display
    - Relay ON/OFF controls for 3 sockets (waits for hardware acknowledgment)
    - Live status polling
-   - Energy readings display */
+   - Real-time energy readings display per socket
+   - Estimated electricity cost calculation */
 
 (function () {
   "use strict";
 
   var API_BASE = "/api";
-  var POLL_INTERVAL = 15000; // 15 seconds
+  var POLL_INTERVAL = 15000; // 15 seconds for device status
+  var ENERGY_POLL_INTERVAL = 5000; // 5 seconds for energy readings
+  var ENERGY_STALE_SECONDS = 60; // Mark readings as stale after 60 seconds
   var ACK_POLL_INTERVAL = 2000; // 2 seconds for command acknowledgment
   var ACK_TIMEOUT_SECONDS = 30; // Max time to wait for acknowledgment
   var csrfToken = document.querySelector('meta[name="csrf-token"]');
@@ -237,9 +240,137 @@
     }
   });
 
+  // ---- Energy readings polling ----
+
+  var electricityRate = 0; // PHP per kWh, set from API response
+
+  function pollEnergyReadings() {
+    var cards = document.querySelectorAll("[data-device-id]");
+    if (!cards.length) return;
+
+    fetch(API_BASE + "/monitoring/latest")
+      .then(function (response) {
+        if (!response.ok) return null;
+        return response.json();
+      })
+      .then(function (data) {
+        if (!data || !data.ok) return;
+
+        // Update electricity rate from server
+        if (data.electricity_rate_php_kwh) {
+          electricityRate = data.electricity_rate_php_kwh;
+        }
+
+        // Update each outlet card
+        cards.forEach(function (card) {
+          var deviceId = card.getAttribute("data-device-id");
+          var outletData = data.outlets && data.outlets[deviceId];
+          if (!outletData || !outletData.sockets) return;
+
+          updateEnergyMeasurements(card, outletData.sockets, electricityRate);
+        });
+      })
+      .catch(function () {
+        // Silently fail on energy poll errors
+      });
+  }
+
+  function updateEnergyMeasurements(card, sockets, rate) {
+    Object.keys(sockets).forEach(function (socketNum) {
+      var reading = sockets[socketNum];
+      var section = card.querySelector('[data-energy-socket="' + socketNum + '"]');
+      if (!section) return;
+
+      if (!reading) {
+        // No reading at all — show "No Reading"
+        setEnergyFields(section, null, "no_reading");
+        return;
+      }
+
+      // Check if reading is stale
+      var state = "fresh";
+      if (reading.recorded_at) {
+        var recordedTime = new Date(reading.recorded_at).getTime();
+        var ageSeconds = (Date.now() - recordedTime) / 1000;
+        if (ageSeconds > ENERGY_STALE_SECONDS) {
+          state = "stale";
+        }
+      }
+
+      setEnergyFields(section, reading, state);
+    });
+  }
+
+  function setEnergyFields(section, reading, state) {
+    var fields = {
+      voltage: { value: null, unit: "V", decimals: 2 },
+      current: { value: null, unit: "A", decimals: 2 },
+      power_watts: { value: null, unit: "W", decimals: 1 },
+      power_factor: { value: null, unit: "", decimals: 2 },
+      energy_kwh: { value: null, unit: "kWh", decimals: 3 },
+      est_cost: { value: null, unit: "PHP", decimals: 2 }
+    };
+
+    Object.keys(fields).forEach(function (fieldName) {
+      var el = section.querySelector('[data-field="' + fieldName + '"]');
+      if (!el) return;
+
+      var config = fields[fieldName];
+
+      if (state === "no_reading" || state === "missing") {
+        el.textContent = "No Reading";
+        el.setAttribute("data-state", "no_reading");
+        el.title = "No verified reading received";
+        el.style.fontStyle = "italic";
+        el.style.opacity = "0.5";
+        return;
+      }
+
+      el.style.fontStyle = "";
+      el.style.opacity = "1";
+
+      if (fieldName === "est_cost") {
+        // Calculate estimated cost from energy × rate
+        var energy = reading.energy_kwh;
+        if (energy != null && rate > 0) {
+          var cost = (energy * rate).toFixed(2);
+          el.textContent = cost;
+          el.setAttribute("data-state", state);
+          el.title = "Estimated: " + energy + " kWh × " + rate + " PHP/kWh";
+        } else {
+          el.textContent = "—";
+          el.setAttribute("data-state", "missing");
+          el.title = "Energy reading required for cost estimate";
+          el.style.opacity = "0.5";
+        }
+      } else {
+        var value = reading[fieldName];
+        if (value != null) {
+          el.textContent = Number(value).toFixed(config.decimals);
+          el.setAttribute("data-state", state);
+          if (state === "stale") {
+            el.title = "Reading is stale (not updated recently)";
+            el.style.fontStyle = "italic";
+            el.style.opacity = "0.7";
+          } else {
+            el.title = "Last updated: " + new Date(reading.recorded_at).toLocaleTimeString();
+          }
+        } else {
+          el.textContent = "—";
+          el.setAttribute("data-state", "missing");
+          el.title = "Sensor unavailable";
+          el.style.opacity = "0.5";
+        }
+      }
+    });
+  }
+
   // ---- Start polling ----
 
   if (document.querySelector("[data-device-id]")) {
     setInterval(pollDeviceStatus, POLL_INTERVAL);
+    setInterval(pollEnergyReadings, ENERGY_POLL_INTERVAL);
+    // Initial fetch
+    pollEnergyReadings();
   }
 })();

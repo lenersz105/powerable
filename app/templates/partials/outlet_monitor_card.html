@@ -55,32 +55,38 @@
     </div>
   </dl>
 
-  <dl class="monitor-measurements" aria-label="{{ outlet.display_name }} measurements">
+  {% for socket_num in range(1, outlet.effective_socket_count + 1) %}
+  <dl class="monitor-measurements" aria-label="{{ outlet.display_name }} socket {{ socket_num }} measurements"
+      data-energy-socket="{{ socket_num }}">
+    <div class="measurements-header">
+      <dt>Socket {{ socket_num }} Electricity</dt>
+    </div>
     <div>
       <dt>Voltage</dt>
-      <dd><span data-field="voltage" data-state="missing" title="No verified reading received">0.00</span> <small>V</small></dd>
+      <dd><span data-field="voltage" data-state="missing" title="No verified reading received">—</span> <small>V</small></dd>
     </div>
     <div>
       <dt>Current</dt>
-      <dd><span data-field="current" data-state="missing" title="No verified reading received">0.00</span> <small>A</small></dd>
+      <dd><span data-field="current" data-state="missing" title="No verified reading received">—</span> <small>A</small></dd>
     </div>
     <div>
       <dt>Active Power</dt>
-      <dd><span data-field="power" data-state="missing" title="No verified reading received">0.00</span> <small>W</small></dd>
+      <dd><span data-field="power_watts" data-state="missing" title="No verified reading received">—</span> <small>W</small></dd>
     </div>
     <div>
       <dt>Power Factor</dt>
-      <dd><span data-field="power-factor" data-state="missing" title="No verified reading received">0.00</span></dd>
+      <dd><span data-field="power_factor" data-state="missing" title="No verified reading received">—</span></dd>
     </div>
     <div>
-      <dt>Total Energy</dt>
-      <dd><span data-field="total-energy" data-state="missing" title="No verified reading received">0.000</span> <small>kWh</small></dd>
+      <dt>Energy</dt>
+      <dd><span data-field="energy_kwh" data-state="missing" title="No verified reading received">—</span> <small>kWh</small></dd>
     </div>
     <div>
-      <dt>Session Energy</dt>
-      <dd><span data-field="session-energy" data-state="missing" title="No verified reading received">0.000</span> <small>kWh</small></dd>
+      <dt>Est. Cost</dt>
+      <dd><span data-field="est_cost" data-state="missing" title="Estimated from energy × rate">—</span> <small>PHP</small></dd>
     </div>
   </dl>
+  {% endfor %}
 
   <p class="monitor-foot">
     <span class="dot is-{{ outlet.connection_tone }}"></span>

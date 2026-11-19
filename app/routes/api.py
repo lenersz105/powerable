@@ -23,7 +23,7 @@ Neither pairing codes nor the device API key are echoed in responses or logs.
 
 import time
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, current_app, jsonify, request, session
 from flask_login import current_user, login_required
 
 from app.device_auth import require_device_key
@@ -393,6 +393,41 @@ def device_telemetry():
         ok=True,
         message="Telemetry received.",
         reading=energy_service.serialize_reading(reading),
+    )
+
+
+@api_bp.get("/monitoring/latest")
+@login_required
+def monitoring_latest():
+    """Dashboard fetches the latest energy readings for all owned outlets.
+
+    Returns one reading per socket per outlet so the dashboard can display
+    real-time measurements without reloading the page.
+    """
+    outlets = device_service.get_user_outlets(current_user.id)
+    if not outlets:
+        return jsonify(
+            ok=True,
+            outlets={},
+            electricity_rate_php_kwh=current_app.config.get("ELECTRICITY_RATE_PHP_KWH", 0),
+        )
+
+    outlet_ids = [o.id for o in outlets]
+    all_readings = energy_service.get_latest_all_sockets(outlet_ids)
+
+    # Build outlet map: device_uid -> {sockets: {1: reading, 2: reading, ...}}
+    outlet_map = {}
+    for outlet in outlets:
+        sockets = all_readings.get(outlet.id, {})
+        outlet_map[outlet.device_uid] = {
+            "sockets": {str(sn): reading for sn, reading in sorted(sockets.items())},
+            "socket_count": outlet.effective_socket_count,
+        }
+
+    return jsonify(
+        ok=True,
+        outlets=outlet_map,
+        electricity_rate_php_kwh=current_app.config.get("ELECTRICITY_RATE_PHP_KWH", 0),
     )
 
 

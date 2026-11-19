@@ -834,6 +834,32 @@
   font-weight: 600;
 }
 
+.measurements-header {
+  grid-column: 1 / -1;
+  padding: 0.3rem 0.48rem 0.2rem;
+  border-bottom: 1px solid var(--stroke);
+  margin-bottom: 0.2rem;
+}
+
+.measurements-header dt {
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Stale and no-reading states */
+[data-state="no_reading"] {
+  color: var(--muted-2) !important;
+  font-style: italic !important;
+}
+
+[data-state="stale"] {
+  color: #f59e0b !important;
+  font-style: italic !important;
+}
+
 .monitor-foot {
   display: flex;
   align-items: center;
