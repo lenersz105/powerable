@@ -186,10 +186,19 @@
     }
     scannerMessage("Checking the label with the local server…");
 
+    // Debug: log what we're sending (without exposing pairing codes in production)
+    if (credentials && credentials.payload) {
+      console.log("[PowerAble] Validating QR payload (length:", credentials.payload.length, ")");
+    } else if (credentials && credentials.device_id) {
+      console.log("[PowerAble] Validating manual entry for device:", credentials.device_id);
+    }
+
     PowerAble.apiPost(validateUrl, credentials)
       .then(function (result) {
         var response = result.response;
         var data = result.data || {};
+
+        console.log("[PowerAble] Validate response:", response.status, data);
 
         if (response.ok && data.ok && data.device) {
           pendingCredentials = credentials;
@@ -198,6 +207,20 @@
         }
 
         var message = friendlyApiError(response, data);
+
+        // Provide more specific guidance for common errors
+        if (data && data.error === "unknown_device") {
+          message = "This QR code does not match a registered SmartOutlet. Make sure the administrator has registered this device first.";
+        } else if (data && data.error === "invalid_qr") {
+          message = "The QR code format is not recognized. Make sure you are scanning the PowerAble pairing label, not a different QR code.";
+        } else if (data && data.error === "already_registered") {
+          message = "This SmartOutlet is already registered to another account. Contact the administrator.";
+        } else if (data && data.error === "not_available") {
+          message = "This SmartOutlet is not available for pairing. Contact the administrator.";
+        } else if (data && data.error === "invalid_code") {
+          message = "The pairing code is not valid for this outlet. The label may have been regenerated — ask the administrator for a new one.";
+        }
+
         if (source === "manual") {
           showManualError(message);
         } else {
@@ -206,9 +229,10 @@
           resumeScannerIfLive();
         }
       })
-      .catch(function () {
+      .catch(function (error) {
+        console.error("[PowerAble] Validate request failed:", error);
         var message =
-          "Could not reach the local PowerAble server. Check that it is still running.";
+          "Could not reach the PowerAble server. Check your internet connection and try again.";
         if (source === "manual") {
           showManualError(message);
         } else {
@@ -294,30 +318,6 @@
     resumeScannerIfLive();
   }
 
-  /* ---------- Scanner setup ---------- */
-
-  if (scannerRoot && typeof PowerAble.createScanner === "function") {
-    scanner = PowerAble.createScanner(scannerRoot, {
-      onDecode: function (raw) {
-        if (busy) {
-          return;
-        }
-        validateCredentials({ payload: raw }, "scan");
-      },
-      onStateChange: function (state) {
-        if (state === "error") {
-          scannerMessage(
-            "Camera unavailable. Manual entry works without a camera."
-          );
-        }
-      },
-    });
-  } else if (scannerRoot) {
-    scannerError(
-      "The scanner engine did not load. You can still enter the device ID and pairing code manually."
-    );
-  }
-
   /* ---------- Secure context notice ---------- */
 
   if (secureWarning && secureContextMissing()) {
@@ -353,6 +353,35 @@
 
   if (registerBtn) {
     registerBtn.addEventListener("click", registerOutlet);
+  }
+
+  /* ---------- Scanner setup ---------- */
+
+  if (scannerRoot && typeof PowerAble.createScanner === "function") {
+    console.log("[PowerAble] Initializing QR scanner engine");
+    scanner = PowerAble.createScanner(scannerRoot, {
+      onDecode: function (raw) {
+        console.log("[PowerAble] QR code decoded (length:", raw.length, "):", raw.substring(0, 80));
+        if (busy) {
+          console.log("[PowerAble] Ignoring decode — busy");
+          return;
+        }
+        validateCredentials({ payload: raw }, "scan");
+      },
+      onStateChange: function (state) {
+        console.log("[PowerAble] Scanner state:", state);
+        if (state === "error") {
+          scannerMessage(
+            "Camera unavailable. Manual entry works without a camera."
+          );
+        }
+      },
+    });
+  } else if (scannerRoot) {
+    console.error("[PowerAble] Scanner engine not available — PowerAble.createScanner is undefined");
+    scannerError(
+      "The scanner engine did not load. You can still enter the device ID and pairing code manually."
+    );
   }
 
   Array.prototype.forEach.call(cancelButtons, function (button) {

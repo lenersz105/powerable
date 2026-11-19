@@ -63,7 +63,7 @@ def _render_label(outlet, pairing_code, device_secret=None):
 
     payload = qr_service.build_payload(outlet.device_uid, pairing_code)
     qr_svg = segno.make(payload, error="m").svg_inline(
-        scale=5, border=3, dark="#0a1220", light="#ffffff"
+        scale=5, border=3, dark="#000000", light="#ffffff"
     )
     response = make_response(
         render_template(
