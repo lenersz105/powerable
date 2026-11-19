@@ -22,10 +22,16 @@
     <div class="page-heading-copy">
       <p class="eyebrow">Pair a device</p>
       <h1>Add Smart Outlet</h1>
-      <p class="page-subtitle">
-        Point your phone at the QR label on the outlet. The server checks that the code is valid
-        and not already claimed before anything is added to your account.
-      </p>
+      {% if current_user.is_admin %}
+        <p class="page-subtitle">
+          Scan the QR label on an admin-provisioned SmartOutlet to claim it for your account.
+          The server checks that the code is valid and not already claimed.
+        </p>
+      {% else %}
+        <p class="page-subtitle">
+          Scan the QR code provided by the PowerAble administrator to add your SmartOutlet to your dashboard.
+        </p>
+      {% endif %}
     </div>
     <div class="heading-meta">
       <span class="status-pill is-waiting" data-permission-pill>

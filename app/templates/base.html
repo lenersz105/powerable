@@ -113,10 +113,17 @@
        href="{{ url_for('dashboard.index') }}">
       {{ icon('activity') }}<span>Live</span>
     </a>
-    <a class="dock-add {% if request.endpoint in ['devices.add', 'devices.pair'] %}is-active{% endif %}"
-       href="{{ url_for('devices.add') }}" aria-label="Add Smart Outlet">
-      {{ icon('plus') }}<span>Add</span>
-    </a>
+    {% if current_user.is_authenticated and current_user.is_admin %}
+      <a class="dock-add {% if request.endpoint in ['devices.add', 'admin.new_outlet'] %}is-active{% endif %}"
+         href="{{ url_for('admin.new_outlet') }}" aria-label="Add Smart Outlet">
+        {{ icon('plus') }}<span>Add</span>
+      </a>
+    {% else %}
+      <a class="dock-add {% if request.endpoint in ['devices.add', 'devices.pair'] %}is-active{% endif %}"
+         href="{{ url_for('devices.pair') }}" aria-label="Add Smart Outlet">
+        {{ icon('plus') }}<span>Add</span>
+      </a>
+    {% endif %}
     <a class="dock-item {% if request.endpoint == 'devices.index' %}is-active{% endif %}"
        href="{{ url_for('devices.index') }}">
       {{ icon('plug') }}<span>Outlets</span>

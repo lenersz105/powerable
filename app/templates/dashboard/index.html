@@ -28,13 +28,17 @@
     <section class="empty-outlets glass-panel">
       <div class="empty-orbit">{{ icon('activity') }}</div>
       <h2>No registered outlets to monitor.</h2>
-      <p>Register a PowerAble outlet first, then its live card will appear here.</p>
-      <a class="btn btn-primary btn-lg" href="{{ url_for('devices.add') }}">
-        {{ icon('plus') }} Add Smart Outlet
-      </a>
-      <p class="empty-hint">
-        Already have a printed label? <a href="{{ url_for('devices.pair') }}">Use the pairing code flow</a>.
-      </p>
+      {% if current_user.is_admin %}
+        <p>Register a new physical SmartOutlet to get started.</p>
+        <a class="btn btn-primary btn-lg" href="{{ url_for('admin.new_outlet') }}">
+          {{ icon('plus') }} Add Smart Outlet
+        </a>
+      {% else %}
+        <p>Scan the QR code provided by the PowerAble administrator to add your SmartOutlet.</p>
+        <a class="btn btn-primary btn-lg" href="{{ url_for('devices.pair') }}">
+          {{ icon('plus') }} Add Smart Outlet
+        </a>
+      {% endif %}
     </section>
   {% else %}
     <section class="monitor-bar glass-panel" aria-label="Connection details">

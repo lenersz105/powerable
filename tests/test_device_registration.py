@@ -5,7 +5,7 @@ import pytest
 from app.extensions import db
 from app.models import SmartOutlet
 from app.services import qr_service
-from tests.support import form_post, provision, register
+from tests.support import create_user, form_post, get_csrf, provision, register, sign_in
 
 DEVICE = "PA-ESP32-A8F291C42D10"
 SECOND_DEVICE = "PA-ESP32-001122334455"
@@ -40,8 +40,24 @@ def test_add_page_requires_authentication(client):
     assert "/auth/login" in response.headers["Location"]
 
 
-def test_add_page_rejects_invalid_device_id(app, client):
+def test_add_page_redirects_non_admin_to_qr_scanner(client):
+    """Regular users are redirected from /devices/add to the QR scanner."""
     register(client, "alice")
+
+    response = client.get("/devices/add")
+    assert response.status_code == 302
+    assert "/devices/pair" in response.headers["Location"]
+
+
+def test_add_page_rejects_invalid_device_id(app, client):
+    """Admin users can still use /devices/add for self-registration."""
+    register(client, "alice")
+    # Promote to admin
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
 
     response = form_post(
         client,
@@ -56,7 +72,13 @@ def test_add_page_rejects_invalid_device_id(app, client):
 
 
 def test_preview_builds_lan_qr_without_registering(app, client):
+    """Admin users can preview QR codes for self-registration."""
     register(client, "alice")
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
 
     response = form_post(
         client,
@@ -90,7 +112,13 @@ def test_qr_png_is_served_and_can_be_downloaded(client):
 
 
 def test_direct_register_assigns_name_and_owner(app, client):
+    """Admin users can self-register devices by device ID."""
     register(client, "alice")
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
 
     response = form_post(
         client,
@@ -164,6 +192,13 @@ def test_another_account_cannot_claim_the_same_device(app, client):
 def test_preview_rejects_an_already_registered_device(app, client):
     register(client, "alice")
     assert _register_via_qr(client).status_code == 201
+
+    # Promote to admin for devices/add access
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
 
     response = form_post(
         client,
@@ -330,3 +365,130 @@ def test_registration_url_rejects_loopback_base(app):
 
     with app.app_context(), pytest.raises(qr_service.QRNetworkError):
         qr_service.build_registration_url(DEVICE)
+
+
+# ---------------------------------------------------------------------------
+# Role-based registration separation tests
+# ---------------------------------------------------------------------------
+
+
+def test_non_admin_cannot_post_to_devices_add(app, client):
+    """Regular users posting to /devices/add are redirected to the QR scanner."""
+    register(client, "alice")
+
+    response = form_post(
+        client,
+        "/devices/add",
+        {"device_id": DEVICE, "action": "register"},
+        csrf_path="/devices/add",
+    )
+
+    # Should redirect to /devices/pair, not register the device
+    assert response.status_code == 302
+    assert "/devices/pair" in response.headers["Location"]
+    assert _count(app) == 0
+
+
+def test_admin_can_access_devices_add(app, client):
+    """Admin users can access /devices/add without redirection."""
+    register(client, "alice")
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
+
+    response = client.get("/devices/add")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Add Smart Outlet" in body
+
+
+def test_user_sees_qr_scanner_for_adding_outlet(client):
+    """Regular users are directed to the QR scanner page for adding outlets."""
+    register(client, "alice")
+
+    response = client.get("/devices/pair")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Add Smart Outlet" in body
+    assert "Scan" in body or "scan" in body.lower()
+
+
+def test_devices_index_shows_qr_scanner_link_for_user(client):
+    """My Outlets page directs regular users to the QR scanner."""
+    register(client, "alice")
+
+    response = client.get("/devices/")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    # The "Add Smart Outlet" button should point to /devices/pair for users
+    assert '/devices/pair' in body
+
+
+def test_devices_index_shows_admin_link_for_admin(app, client):
+    """My Outlets page directs admins to the admin provisioning form."""
+    register(client, "alice")
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
+
+    response = client.get("/devices/")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    # The "Add Smart Outlet" button should point to /admin/outlets/new for admins
+    assert '/admin/outlets/new' in body
+
+
+def test_dashboard_empty_shows_qr_scanner_for_user(client):
+    """Empty dashboard directs regular users to the QR scanner."""
+    register(client, "alice")
+
+    response = client.get("/dashboard/")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert '/devices/pair' in body
+
+
+def test_dashboard_empty_shows_admin_link_for_admin(app, client):
+    """Empty dashboard directs admins to the admin provisioning form."""
+    register(client, "alice")
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
+
+    response = client.get("/dashboard/")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert '/admin/outlets/new' in body
+
+
+def test_mobile_dock_add_routes_user_to_qr_scanner(client):
+    """Mobile dock 'Add' button directs regular users to the QR scanner."""
+    register(client, "alice")
+
+    response = client.get("/")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    # Find the dock-add link — for non-admin it should point to /devices/pair
+    assert 'href="/devices/pair"' in body
+
+
+def test_mobile_dock_add_routes_admin_to_provisioning(app, client):
+    """Mobile dock 'Add' button directs admins to the provisioning form."""
+    register(client, "alice")
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
+
+    response = client.get("/")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    # For admin, the dock-add should point to /admin/outlets/new
+    assert 'href="/admin/outlets/new"' in body

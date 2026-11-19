@@ -249,8 +249,14 @@ def test_website_user_routes_and_ownership_still_work(app, client):
     assert anonymous.get("/devices/").status_code == 302
 
 
-def test_pa_net_device_id_works_with_registration_qr(client):
+def test_pa_net_device_id_works_with_registration_qr(app, client):
+    """PA-NET device IDs work with the admin registration QR preview."""
     register(client, "alice")
+    with app.app_context():
+        from app.models.user import User
+        user = db.session.get(User, db.session.scalar(db.select(User.id).filter_by(username="alice")))
+        user.role = "admin"
+        db.session.commit()
 
     from tests.support import form_post
 

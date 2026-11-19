@@ -37,8 +37,20 @@ def index():
 @devices_bp.route("/add", methods=["GET", "POST"])
 @login_required
 def add():
-    """Enter an ESP32 Device ID, preview its QR link, or register it here."""
+    """Add a SmartOutlet.
 
+    Role-based routing:
+    - Admin: Opens the admin provisioning interface (admin/outlets/new).
+    - Regular user: Opens the QR scanner to claim an admin-provisioned device.
+
+    Regular users cannot self-register devices by device ID.
+    """
+
+    # Non-admin users are redirected to the QR scanner for claiming devices
+    if not current_user.is_admin:
+        return redirect(url_for("devices.pair"))
+
+    # Admin path: self-registration by device ID (legacy flow preserved)
     device_id = (
         request.form.get("device_id") or request.args.get("device_id") or ""
     ).strip()
