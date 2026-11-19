@@ -75,10 +75,11 @@ class Config:
 
     # Shared secret used by the ESP32 Network Handler when it calls the
     # machine-to-machine API. The environment variable always wins; the
-    # fallback exists only for local development. ProductionConfig removes
-    # the fallback so a deployed server cannot silently use the dev key.
+    # fallback exists only for local development and must never be used
+    # in production. ProductionConfig overrides this to fail closed (503)
+    # when DEVICE_API_KEY is not set.
     DEVICE_API_KEY = (
-        os.environ.get("DEVICE_API_KEY") or "PowerAble_Network_2026_Rey_X82k9P"
+        os.environ.get("DEVICE_API_KEY") or "dev-only-fallback-key-do-not-use-in-production"
     ).strip()
 
     # Self-registration QR links. PUBLIC_BASE_URL overrides automatic LAN
@@ -95,6 +96,20 @@ class Config:
     DEVICE_HEARTBEAT_TIMEOUT_SECONDS = int(
         os.environ.get("DEVICE_HEARTBEAT_TIMEOUT_SECONDS", "60")
     )
+
+    # Relay command TTL in seconds (how long a command stays pending).
+    RELAY_COMMAND_TTL_SECONDS = int(
+        os.environ.get("RELAY_COMMAND_TTL_SECONDS", "120")
+    )
+
+    # Maximum pending relay commands per outlet.
+    MAX_PENDING_COMMANDS = int(
+        os.environ.get("MAX_PENDING_COMMANDS", "10")
+    )
+
+    # Wi-Fi credential encryption key (separate from SECRET_KEY).
+    # Falls back to SECRET_KEY if not set, but should be separate in production.
+    WIFI_ENCRYPTION_KEY = os.environ.get("WIFI_ENCRYPTION_KEY", "")
 
     # Application-level metadata shown on the About page.
     APP_NAME = "PowerAble"
@@ -122,6 +137,8 @@ class TestingConfig(Config):
     DEVICE_HEARTBEAT_TIMEOUT_SECONDS = 60
     # Deterministic device key for tests; never used outside pytest.
     DEVICE_API_KEY = "PowerAble_Network_2026_Rey_X82k9P"
+    # Valid Fernet key for Wi-Fi encryption tests (32-byte url-safe base64).
+    WIFI_ENCRYPTION_KEY = "ZmFrZS1mZXJuZXQta2V5LWZvci10ZXN0aW5nLW9ubHk="
 
 
 class ProductionConfig(Config):
