@@ -78,5 +78,62 @@
       verified hardware telemetry arrives.
     </p>
   </aside>
+
+  {% if device_secret is not none %}
+  <aside class="content-card admin-label-aside" aria-label="ESP32 factory provisioning">
+    <div class="card-heading">
+      <h2>{{ icon('shield') }} ESP32 Factory Provisioning</h2>
+      <p>Write this secret into the Network ESP32 firmware. It is shown only once and never stored in plaintext.</p>
+    </div>
+
+    <div class="admin-label-facts">
+      <div><span>Permanent Device ID</span><strong>{{ outlet.device_uid }}</strong></div>
+    </div>
+
+    <div class="field" style="margin-top:12px;">
+      <label class="field-label" for="device-api-secret">Device API Secret</label>
+      <div class="secret-display">
+        <code id="device-api-secret" data-device-secret="{{ device_secret }}">{{ device_secret }}</code>
+        <button class="btn btn-glass btn-sm" type="button" data-copy="{{ device_secret }}">
+          {{ icon('check') }} Copy Secret
+        </button>
+      </div>
+      <span class="field-hint">This value is sent in the <code>X-Device-Key</code> header on every ESP32 cloud request.</span>
+    </div>
+
+    <div class="notice notice-warning" role="alert">
+      {{ icon('shield') }}
+      <div>
+        <strong>Security warning</strong>
+        <p>
+          This secret is displayed only this one time. If you lose it, use
+          <em>Rotate Device API Secret</em> from the outlet management page.
+          The old secret will be invalidated immediately.
+        </p>
+      </div>
+    </div>
+
+    <details class="admin-tool" style="margin-top:12px;">
+      <summary>{{ icon('menu') }} Provisioning instructions</summary>
+      <ol class="steps" style="margin-top:8px;">
+        <li>Open the Network ESP32 firmware project in Arduino IDE or PlatformIO.</li>
+        <li>Write this secret into ESP32 Preferences / NVS:</li>
+      </ol>
+      <pre style="background:#f5f5f5;padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;margin-top:8px;">
+// ESP32 Preferences — write once at factory setup
+#include &lt;Preferences.h&gt;
+
+Preferences prefs;
+prefs.begin("powerable", false);
+prefs.putString("api_key", "{{ device_secret }}");
+prefs.end();</pre>
+      <ol class="steps" style="margin-top:8px;">
+        <li>The firmware reads this value and sends it in the <code>X-Device-Key</code> header on every HTTPS request to the PowerAble cloud backend.</li>
+        <li>Do not include this secret in QR codes, customer-facing pages, logs, or URLs.</li>
+        <li>The customer never enters this secret — only the pre-provisioned ESP32 uses it.</li>
+      </ol>
+    </details>
+  </aside>
+  {% endif %}
 </div>
 {% endblock %}

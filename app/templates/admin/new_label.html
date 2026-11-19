@@ -38,6 +38,36 @@
         <span class="field-hint">Shown in the admin and customer outlet lists.</span>
       </label>
 
+      <details style="margin-top:8px;">
+        <summary>Dual-board ESP32 identity (optional)</summary>
+        <label class="field" style="margin-top:8px;">
+          Hardware ESP32 ID
+          <input type="text" name="hardware_esp32_id" value="{{ values.hardware_esp32_id or '' }}"
+                 maxlength="64" autocapitalize="characters" spellcheck="false"
+                 placeholder="PA-ESP32-A8F291C42D10">
+          <span class="field-hint">Permanent Hardware ESP32 identifier, if different from Device ID.</span>
+        </label>
+        <label class="field">
+          Network ESP32 ID
+          <input type="text" name="network_esp32_id" value="{{ values.network_esp32_id or '' }}"
+                 maxlength="64" autocapitalize="characters" spellcheck="false"
+                 placeholder="PA-NET-12345678">
+          <span class="field-hint">Permanent Network ESP32 identifier.</span>
+        </label>
+        <label class="field">
+          Model
+          <input type="text" name="model" value="{{ values.model or '' }}"
+                 maxlength="64" placeholder="PA-3000">
+          <span class="field-hint">Product model identifier.</span>
+        </label>
+        <label class="field">
+          Socket count
+          <input type="number" name="socket_count" value="{{ values.socket_count or '3' }}"
+                 min="1" max="8" placeholder="3">
+          <span class="field-hint">Number of independent relay sockets (1–8, default 3).</span>
+        </label>
+      </details>
+
       <div class="form-actions">
         <button class="btn btn-primary" type="submit">
           {{ icon('qr') }} Generate label
@@ -53,9 +83,9 @@
     </div>
     <ol class="steps">
       <li><strong>A random pairing code is created.</strong> It contains no Wi-Fi password and no permanent device secret.</li>
-      <li><strong>Only a scrypt hash is stored.</strong> The plaintext code appears exactly once, on the label response.</li>
+      <li><strong>A per-device API secret is generated.</strong> Only its SHA-256 hash is stored. The plaintext appears exactly once on the label response — write it into the Network ESP32 firmware.</li>
       <li><strong>Print or scan the label.</strong> The device is not online merely because a label exists.</li>
-      <li><strong>The code is single-use.</strong> Registering the outlet clears the hash, so the label stops working.</li>
+      <li><strong>The pairing code is single-use.</strong> Registering the outlet clears the hash, so the label stops working.</li>
     </ol>
     <div class="notice notice-neutral" role="note">
       {{ icon('shield') }}

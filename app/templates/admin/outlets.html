@@ -85,6 +85,19 @@
               </form>
             </section>
 
+            <section class="admin-tool">
+              <h3>Rotate Device API Secret</h3>
+              <p class="admin-tool-note">Generates a replacement per-device secret for the Network ESP32. Preserves ownership, pairing, and device identity. The old secret is invalidated immediately — the ESP32 must be reprovisioned.</p>
+              <form class="form-grid" method="post"
+                    action="{{ url_for('admin.rotate_device_secret_route', outlet_id=outlet.id) }}"
+                    data-confirm="Rotate the Device API Secret for {{ outlet.device_uid }}? The ESP32 must be reprovisioned with the new value.">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-actions">
+                  <button class="btn btn-glass btn-sm" type="submit">Rotate secret</button>
+                </div>
+              </form>
+            </section>
+
             {% if outlet.pairing_state != 'revoked' %}
               <section class="admin-tool">
                 <h3>Revoke</h3>

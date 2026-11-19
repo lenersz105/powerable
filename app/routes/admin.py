@@ -26,7 +26,7 @@ from app.models.smart_outlet import PAIRING_STATES
 from app.permissions import admin_required
 from app.services import admin_service, qr_service
 from app.services.admin_service import AdminError
-from app.services.device_service import PairingError
+from app.services.device_service import PairingError, rotate_device_secret
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -189,6 +189,34 @@ def rotate_outlet(outlet_id):
         return redirect(url_for("admin.outlets"))
 
     return _render_label(outlet, code, device_secret=device_secret)
+
+
+@admin_bp.post("/outlets/<int:outlet_id>/rotate-secret")
+@admin_required
+def rotate_device_secret_route(outlet_id):
+    """Rotate only the per-device API secret, preserving ownership and pairing.
+
+    Returns the label page showing the new secret once.
+    """
+    outlet = _outlet_or_404(outlet_id)
+    try:
+        new_secret = rotate_device_secret(outlet)
+    except PairingError as error:
+        _flash_error(error)
+        return redirect(url_for("admin.outlets"))
+
+    admin_service.log_action(
+        current_user,
+        "outlet.secret_rotated",
+        outlet.device_uid,
+        "Device API secret rotated. The old credential is invalidated.",
+        commit=True,
+    )
+
+    # Generate a fresh pairing code for the label display, but keep the
+    # existing one in the database so customer claiming is not disrupted.
+    code = qr_service.generate_pairing_code()
+    return _render_label(outlet, code, device_secret=new_secret)
 
 
 @admin_bp.post("/outlets/<int:outlet_id>/rename")

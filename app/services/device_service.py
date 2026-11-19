@@ -235,6 +235,43 @@ def provision_device(
     return outlet, code, qr_service.build_payload(device_id, code), device_secret
 
 
+def rotate_device_secret(outlet):
+    """Rotate the per-device API secret for an already-provisioned outlet.
+
+    Generates a new cryptographically secure secret, stores only its SHA-256
+    hash, and returns the plaintext once.  Preserves the existing Device ID,
+    customer ownership, pairing state, and all other outlet fields.
+
+    Args:
+        outlet: The SmartOutlet instance to rotate.
+
+    Returns:
+        The plaintext device secret string (shown once to the admin).
+
+    Raises:
+        PairingError: If the outlet does not exist.
+    """
+
+    if outlet is None:
+        raise PairingError("That outlet no longer exists.", status=404, code="not_found")
+
+    new_secret = _generate_device_secret()
+    outlet.device_api_secret = _hash_device_secret(new_secret)
+    outlet.updated_at = utcnow()
+
+    db.session.flush()
+    db.session.add(
+        DeviceEvent(
+            outlet_id=outlet.id,
+            event_type="secret_rotated",
+            description="Device API secret rotated by an administrator.",
+        )
+    )
+    db.session.commit()
+
+    return new_secret
+
+
 def get_outlet_by_device_id(device_id):
     try:
         normalized = qr_service.normalize_device_id(device_id)
